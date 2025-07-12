@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Mail, Lock, Eye, EyeOff, ArrowRight, Sparkles, MapPin, Upload, Check, X } from 'lucide-react';
+import { staticSkills } from './skillsList';
 
 const avatarImages = [
   { id: 1, src: require('../assets/boy.png'), alt: 'Boy Avatar' },
@@ -7,10 +8,6 @@ const avatarImages = [
   { id: 3, src: require('../assets/girl.png'), alt: 'Girl Avatar' },
   { id: 4, src: require('../assets/woman.png'), alt: 'Woman Avatar' },
   { id: 5, src: require('../assets/gamer.png'), alt: 'Gamer Avatar' },
-];
-
-const staticSkills = [
-  'Guitar', 'Cooking', 'French', 'Yoga', 'Painting', 'Coding', 'Photography', 'Design', 'Public Speaking', 'Writing', 'Dancing', 'Singing', 'Drawing', 'Gardening', 'Swimming', 'Chess', 'Math', 'Science', 'Marketing', 'Sales'
 ];
 
 const Register = () => {
@@ -29,6 +26,84 @@ const Register = () => {
   const [avatarPreview, setAvatarPreview] = useState('');
   const [skillHaveInput, setSkillHaveInput] = useState('');
   const [skillWantInput, setSkillWantInput] = useState('');
+  
+  // Validation states
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Validation functions
+  const validateUsername = (username) => {
+    if (!username.trim()) {
+      return 'Username is required';
+    }
+    if (username.includes(' ')) {
+      return 'Username cannot contain spaces';
+    }
+    if (/^\d/.test(username)) {
+      return 'Username cannot start with a number';
+    }
+    if (username.length < 3) {
+      return 'Username must be at least 3 characters long';
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return 'Username can only contain letters, numbers, and underscores';
+    }
+    return '';
+  };
+
+  const validateEmail = (email) => {
+    if (!email.trim()) {
+      return 'Email is required';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return 'Please enter a valid email address';
+    }
+    return '';
+  };
+
+  const validatePassword = (password) => {
+    if (!password) {
+      return 'Password is required';
+    }
+    if (password.length < 6) {
+      return 'Password must be at least 6 characters long';
+    }
+    if (!/(?=.*[a-z])/.test(password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/(?=.*[A-Z])/.test(password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/(?=.*[!@#$%^&*(),.?":{}|<>])/.test(password)) {
+      return 'Password must contain at least one special character';
+    }
+    return '';
+  };
+
+  const validateLocation = (location) => {
+    if (!location.trim()) {
+      return 'Location is required';
+    }
+    return '';
+  };
+
+  const validateSkills = () => {
+    if (formData.skillsHave.length === 0) {
+      return 'Please select at least one skill you have';
+    }
+    if (formData.skillsWant.length === 0) {
+      return 'Please select at least one skill you want to learn';
+    }
+    return '';
+  };
+
+  const validateAvatar = () => {
+    if (!selectedAvatar && !formData.profileFile) {
+      return 'Please select an avatar or upload a custom image';
+    }
+    return '';
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -36,12 +111,67 @@ const Register = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const validateField = (fieldName, value) => {
+    let error = '';
+    switch (fieldName) {
+      case 'name':
+        error = validateUsername(value);
+        break;
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'password':
+        error = validatePassword(value);
+        break;
+      case 'location':
+        error = validateLocation(value);
+        break;
+      default:
+        break;
+    }
+    return error;
+  };
+
+  const handleBlur = (e) => {
+    const { name, value } = e.target;
+    const error = validateField(name, value);
+    setErrors(prev => ({
+      ...prev,
+      [name]: error
+    }));
+    // Remove SweetAlert2 toast for field errors here
+  };
+
+  // Inline error message component
+  const ErrorMessage = ({ error }) => {
+    return (
+      <div className="flex items-center gap-1 mt-1 text-red-400 text-xs" style={{ minHeight: '20px' }}>
+        {error ? <span>{error}</span> : null}
+      </div>
+    );
   };
 
   const handleAvatarSelect = (id) => {
     setSelectedAvatar(id);
     setFormData(prev => ({ ...prev, profileIcon: id, profileFile: null }));
     setAvatarPreview('');
+    // Clear avatar error
+    if (errors.avatar) {
+      setErrors(prev => ({
+        ...prev,
+        avatar: ''
+      }));
+    }
   };
 
   const handleFileChange = (e) => {
@@ -52,6 +182,13 @@ const Register = () => {
       reader.onload = (ev) => setAvatarPreview(ev.target.result);
       reader.readAsDataURL(file);
       setSelectedAvatar(null);
+      // Clear avatar error
+      if (errors.avatar) {
+        setErrors(prev => ({
+          ...prev,
+          avatar: ''
+        }));
+      }
     }
   };
 
@@ -61,6 +198,13 @@ const Register = () => {
         ...prev,
         [type]: [...prev[type], skill]
       }));
+      // Clear skills error
+      if (errors.skills) {
+        setErrors(prev => ({
+          ...prev,
+          skills: ''
+        }));
+      }
     }
   };
 
@@ -71,8 +215,36 @@ const Register = () => {
     }));
   };
 
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Validate all fields
+    newErrors.name = validateUsername(formData.name);
+    newErrors.email = validateEmail(formData.email);
+    newErrors.password = validatePassword(formData.password);
+    newErrors.location = validateLocation(formData.location);
+    newErrors.skills = validateSkills();
+    newErrors.avatar = validateAvatar();
+    
+    setErrors(newErrors);
+    
+    // Return only errors that are not empty
+    const errorList = Object.values(newErrors).filter(error => error !== '');
+    return errorList;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form before submission
+    let errorList = validateForm();
+    if (errorList.length > 0) {
+      errorList = errorList.sort();
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
     try {
       console.log('Attempting to register user...');
       const formDataToSend = new FormData();
@@ -87,28 +259,43 @@ const Register = () => {
       if (formData.profileFile) {
         formDataToSend.append('profilePhoto', formData.profileFile);
       }
+      
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         body: formDataToSend
       });
+      
       const data = await response.json();
+      
       if (response.ok && data.success) {
-        console.log('✅ Registration successful!', data);
-        alert('Registration successful! You can now log in.');
         window.location.href = '/login';
       } else {
-        console.error('❌ Registration failed:', data);
-        alert(`Registration failed: ${data.message || 'Unknown error'}`);
+        let serverError = 'Registration failed: ' + (data.message || 'Unknown error');
+        if (data.message && data.message.includes('username')) {
+          serverError = 'Username already exists';
+        } else if (data.message && data.message.includes('email')) {
+          serverError = 'Email already exists';
+        }
+        setErrors(prev => ({
+          ...prev,
+          server: serverError
+        }));
       }
     } catch (error) {
-      console.error('❌ Registration error:', error);
-      alert('Registration failed: Network error or server unavailable');
+      setErrors(prev => ({
+        ...prev,
+        server: 'Network error or server unavailable'
+      }));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl w-full space-y-8">
+        {/* SweetAlert2 Test Button */}
+        
         {/* Header */}
         <div className="text-center">
           <div className="flex justify-center mb-4">
@@ -126,6 +313,9 @@ const Register = () => {
         {/* Form */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8 transition-shadow duration-200 hover:shadow-2xl">
           <form onSubmit={handleSubmit}>
+            {errors.server && (
+              <div className="mb-4 text-center text-red-600 font-semibold">{errors.server}</div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
               {/* Left column - Username, Location, Skills I Have */}
               <div className="space-y-6">
@@ -143,10 +333,16 @@ const Register = () => {
                       required
                       value={formData.name}
                       onChange={handleInputChange}
-                      className="pl-10 pr-4 py-3 w-full border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      onBlur={handleBlur}
+                      className={`pl-10 pr-4 py-3 w-full border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 ${
+                        errors.name 
+                          ? 'border-red-300 bg-red-50 focus:bg-red-50' 
+                          : 'border-gray-200 bg-gray-50 focus:bg-white'
+                      }`}
                       placeholder="Enter your username"
                     />
                   </div>
+                  <ErrorMessage error={errors.name} />
                 </div>
                 {/* Location field */}
                 <div>
@@ -162,16 +358,26 @@ const Register = () => {
                       required
                       value={formData.location}
                       onChange={handleInputChange}
-                      className="pl-10 pr-4 py-3 w-full border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      onBlur={handleBlur}
+                      className={`pl-10 pr-4 py-3 w-full border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 ${
+                        errors.location 
+                          ? 'border-red-300 bg-red-50 focus:bg-red-50' 
+                          : 'border-gray-200 bg-gray-50 focus:bg-white'
+                      }`}
                       placeholder="Enter your location"
                     />
                   </div>
+                  <ErrorMessage error={errors.location} />
                 </div>
                 {/* Skills I Have */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Skills I Have</label>
                   <select
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-purple-500 focus:border-transparent mb-2"
+                    className={`w-full border rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent mb-2 ${
+                      errors.skills 
+                        ? 'border-red-300 bg-red-50' 
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
                     value={skillHaveInput}
                     onChange={e => {
                       setSkillHaveInput('');
@@ -191,6 +397,7 @@ const Register = () => {
                       </span>
                     ))}
                   </div>
+                  <ErrorMessage error={errors.skills} />
                 </div>
               </div>
               {/* Right column - Email, Password, Skills I Want */}
@@ -209,10 +416,16 @@ const Register = () => {
                       required
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="pl-10 pr-4 py-3 w-full border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      onBlur={handleBlur}
+                      className={`pl-10 pr-4 py-3 w-full border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 ${
+                        errors.email 
+                          ? 'border-red-300 bg-red-50 focus:bg-red-50' 
+                          : 'border-gray-200 bg-gray-50 focus:bg-white'
+                      }`}
                       placeholder="Enter your email"
                     />
                   </div>
+                  <ErrorMessage error={errors.email} />
                 </div>
                 {/* Password field */}
                 <div>
@@ -228,7 +441,12 @@ const Register = () => {
                       required
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="pl-10 pr-12 py-3 w-full border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      onBlur={handleBlur}
+                      className={`pl-10 pr-12 py-3 w-full border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 ${
+                        errors.password 
+                          ? 'border-red-300 bg-red-50 focus:bg-red-50' 
+                          : 'border-gray-200 bg-gray-50 focus:bg-white'
+                      }`}
                       placeholder="Enter your password"
                     />
                     <button
@@ -239,12 +457,17 @@ const Register = () => {
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
+                  <ErrorMessage error={errors.password} />
                 </div>
                 {/* Skills I Want */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Skills I Want</label>
                   <select
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-purple-500 focus:border-transparent mb-2"
+                    className={`w-full border rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent mb-2 ${
+                      errors.skills 
+                        ? 'border-red-300 bg-red-50' 
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
                     value={skillWantInput}
                     onChange={e => {
                       setSkillWantInput('');
@@ -264,9 +487,13 @@ const Register = () => {
                       </span>
                     ))}
                   </div>
+                  <ErrorMessage error={errors.skills} />
                 </div>
               </div>
             </div>
+            
+            {/* Skills error message */}
+            
             {/* Avatar selection at the end */}
             <div className="mt-8">
               <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -317,14 +544,20 @@ const Register = () => {
                   </div>
                 </div>
               )}
+              <ErrorMessage error={errors.avatar} />
             </div>
             {/* Submit button */}
             <button
               type="submit"
-              className="w-full mt-8 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:scale-105"
+              disabled={isSubmitting}
+              className={`w-full mt-8 py-3 px-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg ${
+                isSubmitting
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 hover:scale-105'
+              }`}
             >
-              <span>Create Account</span>
-              <ArrowRight size={20} />
+              <span>{isSubmitting ? 'Creating Account...' : 'Create Account'}</span>
+              {!isSubmitting && <ArrowRight size={20} />}
             </button>
             {/* Divider */}
             <div className="mt-8">
