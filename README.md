@@ -37,7 +37,7 @@ Skillswap/
 
 ### 1. Clone the repository
 ```bash
-git clone [<your-repo-url>](https://github.com/PatelDharmik268/Skill_Swaper_oddooptimizer)
+git clone https://github.com/PatelDharmik268/Skill_Swaper_oddooptimizer
 cd Skillswap
 ```
 
@@ -47,6 +47,7 @@ cd backend
 npm install
 # Create a .env file or edit env.txt with your MongoDB URI and JWT secret
 # Example env.txt:
+# PORT=5000
 # MONGO_URI=mongodb://localhost:27017/skillswap
 # JWT_SECRET=your_jwt_secret
 npm start
