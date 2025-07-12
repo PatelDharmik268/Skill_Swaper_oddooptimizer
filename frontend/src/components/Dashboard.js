@@ -73,12 +73,14 @@ const Dashboard = () => {
   };
 
   // Filtered and paginated profiles
+  // Get logged-in userId from localStorage (or user state)
+  const loggedInUserId = user && user._id ? user._id : localStorage.getItem('userId');
   const filteredProfiles = users.filter(
     (p) =>
       p.public !== false &&
       (availability === 'All' || (p.availability || '').includes(availability)) &&
-      ((p.name || (p.firstName + ' ' + (p.lastName || '')).trim() || p.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.username || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      ((p.username || '').toLowerCase().includes(searchQuery.toLowerCase())) &&
+      p._id !== loggedInUserId // Exclude the logged-in user
   );
   const totalPages = Math.ceil(filteredProfiles.length / profilesPerPage);
   const paginatedProfiles = filteredProfiles.slice(

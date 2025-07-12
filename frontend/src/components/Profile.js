@@ -293,10 +293,10 @@ const Profile = () => {
                 {/* Name and Title */}
                 <div className="text-center mb-4">
                   <h1 className="text-2xl font-bold text-white mb-1">
-                    {display((profile.firstName + ' ' + (profile.lastName || '')).trim() || profile.username)}
+                    {profile.username}
                   </h1>
                   <p className="text-white/80 text-base">
-                    @{profile.username || 'username'}
+                    @{profile.username}
                   </p>
                 </div>
 
@@ -358,35 +358,25 @@ const Profile = () => {
           <div className="p-6 space-y-6">
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Name Fields */}
+              {/* Username */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-2 text-left">
                   <User size={16} />
-                  Full Name
+                  Username
                 </label>
                 {editMode ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={editProfile.firstName || ''}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/50 backdrop-blur-sm text-left"
-                      placeholder="First Name"
-                    />
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={editProfile.lastName || ''}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/50 backdrop-blur-sm text-left"
-                      placeholder="Last Name"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    name="username"
+                    value={editProfile.username || ''}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/50 backdrop-blur-sm text-left"
+                    placeholder="username"
+                  />
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 rounded-xl text-left">
                     <span className="text-gray-800 font-medium">
-                      {display((profile.firstName + ' ' + (profile.lastName || '')).trim() || profile.username)}
+                      {display(profile.username)}
                     </span>
                   </div>
                 )}
@@ -462,30 +452,6 @@ const Profile = () => {
                   <div className="px-4 py-3 bg-gray-50 rounded-xl text-left">
                     <span className="text-gray-800 font-medium">
                       {display(profile.availability)}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Username */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-2 text-left">
-                  <User size={16} />
-                  Username
-                </label>
-                {editMode ? (
-                  <input
-                    type="text"
-                    name="username"
-                    value={editProfile.username || ''}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/50 backdrop-blur-sm text-left"
-                    placeholder="username"
-                  />
-                ) : (
-                  <div className="px-4 py-3 bg-gray-50 rounded-xl text-left">
-                    <span className="text-gray-800 font-medium">
-                      {display(profile.username)}
                     </span>
                   </div>
                 )}
