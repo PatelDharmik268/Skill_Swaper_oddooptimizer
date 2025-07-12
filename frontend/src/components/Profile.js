@@ -188,6 +188,19 @@ const Profile = () => {
   // Helper for display
   const display = (val, fallback = 'Not set') => (val && val.trim() ? val : fallback);
 
+  const AVAILABILITY_OPTIONS = [
+    '',
+    'Early Mornings',
+    'Mornings',
+    'Afternoons',
+    'Evenings',
+    'Late Nights',
+    'Weekdays',
+    'Weekends',
+    'Flexible',
+    // 'Custom',
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-2xl mx-auto">
@@ -443,10 +456,9 @@ const Profile = () => {
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 bg-white/50 backdrop-blur-sm text-left"
                   >
-                    <option value="">Select availability</option>
-                    <option value="Mornings">Mornings</option>
-                    <option value="Evenings">Evenings</option>
-                    <option value="Weekends">Weekends</option>
+                    {AVAILABILITY_OPTIONS.map(option => (
+                      <option key={option} value={option}>{option ? option : 'Select availability'}</option>
+                    ))}
                   </select>
                 ) : (
                   <div className="px-4 py-3 bg-gray-50 rounded-xl text-left">

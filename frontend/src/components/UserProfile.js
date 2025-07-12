@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { User, MapPin, Star, Clock, X, ChevronLeft } from 'lucide-react';
 import { toast } from 'react-toastify';
 import UserRatings from './UserRatings';
 
 const UserProfile = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -56,9 +58,16 @@ const UserProfile = () => {
     }
   }, [showRequestModal]);
 
+  // Check for showSwapForm param on mount
+  // Only change button state, do not open modal if showSwapForm is true
+  // (No-op here)
+
   const parseSkills = (skillsString) => {
     if (!skillsString || typeof skillsString !== 'string') return [];
-    return skillsString.split(',').map(s => s.replace(/["]+/g, '').trim()).filter(Boolean);
+    return skillsString
+      .split(',')
+      .map(s => s.replace(/["]+/g, '').trim().toLowerCase())
+      .filter(Boolean);
   };
 
   const handleSkillExchange = () => {
@@ -77,33 +86,56 @@ const UserProfile = () => {
     console.log('Back to dashboard');
   };
 
+  // --- Skill swap dropdown logic ---
+  // For 'Choose one of your offered skills': intersection of myProfile.skillsOffered & profile.skillsWanted
+  const validMyOfferedSkills = myProfile && profile
+    ? parseSkills(myProfile.skillsOfferedOrig).filter(skill =>
+        parseSkills(profile.skillsWantedOrig).includes(skill)
+      )
+    : [];
+  // For 'Choose one of their offered skills you want': intersection of profile.skillsOffered & myProfile.skillsWanted
+  const validTheirOfferedSkills = myProfile && profile
+    ? parseSkills(profile.skillsOfferedOrig).filter(skill =>
+        parseSkills(myProfile.skillsWantedOrig).includes(skill)
+      )
+    : [];
+
+  // For display, use original case (not lowercased)
+  const getOriginalSkills = (skillsString) => {
+    if (!skillsString || typeof skillsString !== 'string') return [];
+    return skillsString.split(',').map(s => s.replace(/["]+/g, '').trim()).filter(Boolean);
+  };
+  // Store original skills for display
+  if (myProfile && !myProfile.skillsOfferedOrig) myProfile.skillsOfferedOrig = myProfile.skillsOffered;
+  if (myProfile && !myProfile.skillsWantedOrig) myProfile.skillsWantedOrig = myProfile.skillsWanted;
+  if (profile && !profile.skillsOfferedOrig) profile.skillsOfferedOrig = profile.skillsOffered;
+  if (profile && !profile.skillsWantedOrig) profile.skillsWantedOrig = profile.skillsWanted;
+
+  // For dropdown display, get the original-cased skill
+  const validMyOfferedSkillsDisplay = myProfile && profile
+    ? getOriginalSkills(myProfile.skillsOfferedOrig).filter(skill =>
+        parseSkills(profile.skillsWantedOrig).includes(skill.trim().toLowerCase())
+      )
+    : [];
+  const validTheirOfferedSkillsDisplay = myProfile && profile
+    ? getOriginalSkills(profile.skillsOfferedOrig).filter(skill =>
+        parseSkills(myProfile.skillsWantedOrig).includes(skill.trim().toLowerCase())
+      )
+    : [];
+
   const handleSubmitRequest = async (e) => {
     e.preventDefault();
     setFormError('');
     if (!myProfile || !profile) return;
-    const mySkills = parseSkills(myProfile.skillsOffered);
-    const myWants = parseSkills(myProfile.skillsWanted);
-    const theirOffered = parseSkills(profile.skillsOffered);
-    if (!selectedMySkill || !mySkills.includes(selectedMySkill)) {
+    if (!selectedMySkill) {
       toast.error('Please select one of your valid offered skills.');
       return;
     }
-    // Only allow wanted skills that are both in myWants and theirOffered
-    if (!selectedTheirSkill || !theirOffered.includes(selectedTheirSkill)) {
+    if (!selectedTheirSkill) {
       toast.error('Please select a skill you want that the user actually offers.');
       return;
     }
-    // New validation: offered skill must be wanted by the other user
-    const theirWants = parseSkills(profile.skillsWanted);
-    if (!theirWants.includes(selectedMySkill)) {
-      toast.error('The skill you are offering is not wanted by this user.');
-      return;
-    }
-    // New validation: wanted skill must be in my own wanted skills
-    if (!myWants.includes(selectedTheirSkill)) {
-      toast.error('The skill you want must be in your own wanted skills list.');
-      return;
-    }
+    // No further validation needed as dropdowns only show valid options
     const userId = localStorage.getItem('userId');
     const token = localStorage.getItem('token');
     try {
@@ -130,6 +162,16 @@ const UserProfile = () => {
       }
     } catch (err) {
       toast.error('Failed to send request.');
+    }
+  };
+
+  // Determine where to go back
+  const showSwapForm = new URLSearchParams(location.search).get('showSwapForm') === 'true';
+  const handleBack = () => {
+    if (showSwapForm) {
+      navigate('/swap-requests');
+    } else {
+      navigate('/dashboard');
     }
   };
 
@@ -165,7 +207,16 @@ const UserProfile = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      
+      {/* Back Button */}
+      <div className="max-w-4xl mx-auto px-4 pt-8">
+        <button
+          onClick={handleBack}
+          className="group flex items-center gap-3 px-6 py-3 bg-white/80 backdrop-blur-sm rounded-full border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-white/90 mb-6"
+        >
+          <ChevronLeft size={20} className="text-purple-600 group-hover:-translate-x-1 transition-transform duration-300" />
+          <span className="font-semibold text-gray-700">{showSwapForm ? 'Back to Swap Requests' : 'Back to Dashboard'}</span>
+        </button>
+      </div>
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -204,10 +255,11 @@ const UserProfile = () => {
               </div>
               <div className="flex items-center gap-4">
                 <button
-                  onClick={handleSkillExchange}
-                  className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors shadow-md"
+                  onClick={new URLSearchParams(location.search).get('showSwapForm') === 'true' ? undefined : handleSkillExchange}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-colors shadow-md ${new URLSearchParams(location.search).get('showSwapForm') === 'true' ? 'bg-gray-400 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'}`}
+                  disabled={new URLSearchParams(location.search).get('showSwapForm') === 'true'}
                 >
-                  Request
+                  {new URLSearchParams(location.search).get('showSwapForm') === 'true' ? 'Requested' : 'Request'}
                 </button>
               </div>
             </div>
@@ -313,38 +365,54 @@ const UserProfile = () => {
         </div>
       </div>
       {showRequestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div id="skillSwapFormModal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
             <button onClick={closeModal} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
             <h2 className="text-xl font-bold mb-6 text-center">Send Skill Swap Request</h2>
             <form className="space-y-6" onSubmit={handleSubmitRequest}>
               <div>
                 <label className="block mb-2 font-medium text-gray-700">Choose one of your offered skills</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500"
-                  value={selectedMySkill}
-                  onChange={e => setSelectedMySkill(e.target.value)}
-                  required
-                >
-                  <option value="" disabled>Select a skill</option>
-                  {myProfile && parseSkills(myProfile.skillsOffered).map(skill => (
-                    <option key={skill} value={skill}>{skill}</option>
-                  ))}
-                </select>
+                {(!myProfile || !profile) ? (
+                  <div className="text-gray-400 italic">Loading...</div>
+                ) : validMyOfferedSkillsDisplay.length === 0 ? (
+                  <select className="w-full border border-gray-300 rounded-lg px-4 py-2" disabled>
+                    <option>No matching skills found for swap</option>
+                  </select>
+                ) : (
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500"
+                    value={selectedMySkill}
+                    onChange={e => setSelectedMySkill(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Select a skill</option>
+                    {validMyOfferedSkillsDisplay.map(skill => (
+                      <option key={skill} value={skill}>{skill}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block mb-2 font-medium text-gray-700">Choose one of their offered skills you want</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500"
-                  value={selectedTheirSkill}
-                  onChange={e => setSelectedTheirSkill(e.target.value)}
-                  required
-                >
-                  <option value="" disabled>Select a skill</option>
-                  {profile && parseSkills(profile.skillsOffered).map(skill => (
-                    <option key={skill} value={skill}>{skill}</option>
-                  ))}
-                </select>
+                {(!myProfile || !profile) ? (
+                  <div className="text-gray-400 italic">Loading...</div>
+                ) : validTheirOfferedSkillsDisplay.length === 0 ? (
+                  <select className="w-full border border-gray-300 rounded-lg px-4 py-2" disabled>
+                    <option>No matching skills found for swap</option>
+                  </select>
+                ) : (
+                  <select
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500"
+                    value={selectedTheirSkill}
+                    onChange={e => setSelectedTheirSkill(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Select a skill</option>
+                    {validTheirOfferedSkillsDisplay.map(skill => (
+                      <option key={skill} value={skill}>{skill}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block mb-2 font-medium text-gray-700">Message</label>

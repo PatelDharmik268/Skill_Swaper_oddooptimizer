@@ -312,9 +312,22 @@ const SwapRequests = () => {
           {filteredOffers.map(offer => {
             const otherUser = offer.otherUser;
             const isRequester = offer.userRole === 'requester';
-            
+            // Card click handler
+            const handleCardClick = (e) => {
+              // Prevent button clicks inside the card from triggering navigation
+              if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+              navigate(`/user/${otherUser._id}?showSwapForm=true`);
+            };
             return (
-              <div key={offer._id} className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-center sm:items-stretch p-4 sm:p-6 gap-4 sm:gap-8 transition-transform hover:scale-[1.01]">
+              <div
+                key={offer._id}
+                className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-center sm:items-stretch p-4 sm:p-6 gap-4 sm:gap-8 transition-transform hover:scale-[1.01] cursor-pointer group"
+                onClick={handleCardClick}
+                tabIndex={0}
+                role="button"
+                onKeyDown={e => { if (e.key === 'Enter') handleCardClick(e); }}
+                title="View Profile"
+              >
                 {/* Profile Photo */}
                 <div className="flex-shrink-0 flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full text-3xl font-bold text-purple-600">
                   {otherUser.profilePhoto ? (
@@ -327,7 +340,13 @@ const SwapRequests = () => {
                 {/* Info */}
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg font-semibold text-gray-800">{otherUser.username}</span>
+                    <button
+                      className="text-lg font-semibold text-purple-700 group-hover:underline focus:outline-none"
+                      tabIndex={-1}
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {otherUser.username}
+                    </button>
                     <span className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       isRequester ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
                     }`}>
