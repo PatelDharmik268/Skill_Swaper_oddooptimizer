@@ -13,19 +13,35 @@ A simplified Node.js/Express backend API for user authentication (login and regi
 ## 📁 Project Structure
 
 ```
-backend/
-├── models/
-│   └── User.js              # User model with authentication
-├── routes/
-│   └── auth.js              # Authentication routes (login/register)
-├── server.js                # Main server file
-├── package.json             # Dependencies and scripts
-└── README.md               # This file
+skillswaper/
+├── backend/
+│   ├── controllers/
+│   │   └── authController.js         # Separate logic from routes
+│   ├── middleware/
+│   │   └── auth.js                   # Auth middleware
+│   ├── models/
+│   │   ├── User.js                   # User model
+│   │   └── SwapOffer.js              # Swap offer model
+│   ├── routes/
+│   │   ├── authRoutes.js             # Auth routes
+│   │   ├── feedbackRoutes.js         # Feedback routes
+│   │   └── swapOfferRoutes.js        # Swap routes
+│   ├── utils/
+│   │   └── validators.js             # express-validator helpers
+│   ├── config/
+│   │   └── db.js                     # MongoDB connection logic
+│   ├── .env                          # Environment variables
+│   ├── .gitignore
+│   ├── package.json
+│   ├── server.js                     # App entry point
+│   └── README.md
+├── frontend/                         # React or other frontend app
+
 ```
 
 ## 🛠️ Installation
 
-1. **Install dependencies**
+1. **Install dependencies in both folders**
    ```bash
    npm install
    ```
