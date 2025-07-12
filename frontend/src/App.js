@@ -10,6 +10,7 @@ import UserProfile from './components/UserProfile';
 import SwapRequests from './components/SwapRequests';
 import AdminSwapRequest from './components/AdminSwapRequest';
 import AdminDashboard from './components/AdminDashboard';
+import SkillXchangeLanding from './components/Landing';
 import './App.css';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -19,7 +20,7 @@ function App() {
     <div className="App">
       <Router>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<SkillXchangeLanding />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/adminswaprequest" element={<AdminSwapRequest />} />
