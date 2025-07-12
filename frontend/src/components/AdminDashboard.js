@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   Search,
@@ -8,109 +8,44 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-
-// Sample data for demonstration
-const profiles = [
-  {
-    id: 1,
-    name: 'Marc Demo',
-    photo: '',
-    skillsOffered: ['Guitar', 'Cooking'],
-    skillsWanted: ['French', 'Yoga'],
-    rating: 3.8,
-    public: true,
-    status: 'pending',
-  },
-  {
-    id: 2,
-    name: 'Michell',
-    photo: '',
-    skillsOffered: ['Painting'],
-    skillsWanted: ['Coding'],
-    rating: 2.5,
-    public: true,
-    status: 'success',
-  },
-  {
-    id: 3,
-    name: 'Joe Vills',
-    photo: '',
-    skillsOffered: ['Yoga'],
-    skillsWanted: ['Guitar'],
-    rating: 4.0,
-    public: true,
-    status: 'reject',
-  },
-  {
-    id: 4,
-    name: 'Sara Lee',
-    photo: '',
-    skillsOffered: ['Coding', 'Public Speaking'],
-    skillsWanted: ['Painting'],
-    rating: 4.7,
-    public: true,
-    status: 'pending',
-  },
-  {
-    id: 5,
-    name: 'Alex Kim',
-    photo: '',
-    skillsOffered: ['French', 'Yoga'],
-    skillsWanted: ['Cooking'],
-    rating: 3.2,
-    public: true,
-    status: 'success',
-  },
-  {
-    id: 6,
-    name: 'Priya Singh',
-    photo: '',
-    skillsOffered: ['Cooking', 'Painting'],
-    skillsWanted: ['Public Speaking'],
-    rating: 4.9,
-    public: true,
-    status: 'reject',
-  },
-  {
-    id: 7,
-    name: 'John Doe',
-    photo: '',
-    skillsOffered: ['Coding', 'Yoga'],
-    skillsWanted: ['Guitar', 'French'],
-    rating: 4.3,
-    public: true,
-    status: 'pending',
-  },
-  {
-    id: 8,
-    name: 'Emily Carter',
-    photo: '',
-    skillsOffered: ['Public Speaking'],
-    skillsWanted: ['Painting', 'Yoga'],
-    rating: 3.6,
-    public: true,
-    status: 'success',
-  },
-];
+import { useNavigate } from 'react-router-dom';
 
 const statusOptions = ['All', 'pending', 'success', 'reject'];
 
-const SwapRequests = () => {
+const AdminDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState('All');
+  const [users, setUsers] = useState([]);
   const profilesPerPage = 5;
   const isLoggedIn = true; // Replace with real auth logic
+  const navigate = useNavigate();
 
-  // Filtered and paginated profiles
-  const filteredProfiles = profiles.filter(
-    (p) =>
-      p.public &&
-      (status === 'All' || p.status === status) &&
-      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/auth/users');
+        const data = await res.json();
+        if (res.ok && data.success && Array.isArray(data.users)) {
+          setUsers(data.users);
+        }
+      } catch (err) {
+        setUsers([]);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Filtered and paginated users
+  const filteredUsers = users.filter(
+    (u) =>
+      (status === 'All' || u.status === status) &&
+      ((u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (u.firstName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (u.lastName || '').toLowerCase().includes(searchQuery.toLowerCase()))
   );
-  const totalPages = Math.ceil(filteredProfiles.length / profilesPerPage);
-  const paginatedProfiles = filteredProfiles.slice(
+  const totalPages = Math.ceil(filteredUsers.length / profilesPerPage);
+  const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * profilesPerPage,
     currentPage * profilesPerPage
   );
@@ -130,7 +65,12 @@ const SwapRequests = () => {
           {/* Nav links */}
           <nav className="flex items-center space-x-2 md:space-x-6">
             <button className="px-3 py-2 rounded-lg font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">Users</button>
-            <button className="px-3 py-2 rounded-lg font-medium text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors">Swap request</button>
+            <button
+              className="px-3 py-2 rounded-lg font-medium text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+              onClick={() => navigate('/adminswaprequest')}
+            >
+              Swap request
+            </button>
           </nav>
           {/* Profile */}
           <div className="flex items-center space-x-3">
@@ -138,7 +78,11 @@ const SwapRequests = () => {
               <User size={16} className="text-purple-600" />
             </div>
             <span className="text-gray-700 font-medium hidden sm:block">Admin</span>
-            <button onClick={() => window.location.reload()} className="text-gray-400 hover:text-purple-600 transition-colors" title="Logout">
+            <button onClick={() => {
+              localStorage.removeItem('userId');
+              localStorage.removeItem('token');
+              navigate('/login');
+            }} className="text-gray-400 hover:text-purple-600 transition-colors" title="Logout">
               <LogOut size={20} />
             </button>
           </div>
@@ -176,41 +120,57 @@ const SwapRequests = () => {
           </div>
         </div>
 
-        {/* Profile Cards and Pagination Wrapper */}
+        {/* User Cards and Pagination Wrapper */}
         <div className="flex-1 flex flex-col">
           <div className="space-y-5 flex-1">
-            {paginatedProfiles.length === 0 && (
-              <div className="text-center text-gray-400 py-10">No profiles found.</div>
+            {paginatedUsers.length === 0 && (
+              <div className="text-center text-gray-400 py-10">No users found.</div>
             )}
-            {paginatedProfiles.map(profile => (
-              <div key={profile.id} className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-center sm:items-stretch p-4 sm:p-6 gap-4 sm:gap-8 transition-transform hover:scale-[1.01]">
+            {paginatedUsers.map(user => (
+              <div key={user._id} className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-center sm:items-stretch p-4 sm:p-6 gap-4 sm:gap-8 transition-transform hover:scale-[1.01]">
                 {/* Profile Photo */}
-                <div className="flex-shrink-0 flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full text-3xl font-bold text-purple-600">
-                  {profile.name.split(' ').map(n => n[0]).join('')}
+                <div className="flex-shrink-0 flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full">
+                  {user.profilePhoto ? (
+                    <img src={user.profilePhoto} alt="Profile" className="w-20 h-20 rounded-full object-cover" />
+                  ) : (
+                    <User size={48} className="text-purple-600" />
+                  )}
                 </div>
                 {/* Info */}
                 <div className="flex-1 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg font-semibold text-gray-800">{profile.name}</span>
+                    <span className="text-lg font-semibold text-gray-800">{user.username}</span>
                     <span className="flex items-center text-yellow-500 ml-2">
                       <Star size={16} className="mr-1" />
-                      <span className="text-sm font-medium">{profile.rating.toFixed(1)}</span>
+                      <span className="text-sm font-medium">N/A</span>
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-1">
                     <span className="text-xs text-gray-500 py-1">Skills Offered:</span>
-                    {profile.skillsOffered.map(skill => (
-                      <span key={skill} className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
+                    {user.skillsOffered?.split(',').map(skill => (
+                      <span key={skill} className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">{skill.trim()}</span>
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-2 mb-1">
                     <span className="text-xs text-gray-500 py-1">Skills Wanted:</span>
-                    {profile.skillsWanted.map(skill => (
-                      <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
+                    {user.skillsWanted?.split(',').map(skill => (
+                      <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill.trim()}</span>
                     ))}
                   </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-400">Availability:</span>
+                    <span className="text-xs text-gray-700 font-medium">{user.availability}</span>
+                  </div>
                 </div>
-                {/* Status Button removed */}
+                {/* Reject Button on the right */}
+                <div className="flex items-center justify-end w-full sm:w-auto sm:ml-auto mt-4 sm:mt-0">
+                  <button
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors shadow"
+                    onClick={() => alert(`Reject action for user: ${user.username}`)}
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -251,4 +211,4 @@ const SwapRequests = () => {
   );
 };
 
-export default SwapRequests;
+export default AdminDashboard;

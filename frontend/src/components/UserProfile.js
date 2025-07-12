@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { User, MapPin, Star, Clock, X, ChevronLeft } from 'lucide-react';
 import { toast } from 'react-toastify';
+import UserRatings from './UserRatings';
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -184,16 +185,21 @@ const UserProfile = () => {
                     <User size={40} className="text-purple-400" />
                   )}
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center mb-1">
+                    <Star size={20} className="text-yellow-500" />
+                    <span className="text-lg font-bold text-gray-800 ml-1">
+                      {typeof profile.averageRating === 'number' ? profile.averageRating.toFixed(1) : 'N/A'}
+                    </span>
+                    {profile.totalRatings > 0 && (
+                      <span className="text-xs text-gray-500 ml-2">
+                        ({profile.totalRatings} {profile.totalRatings === 1 ? 'rating' : 'ratings'})
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-2xl font-bold text-gray-900">
                     {profile.username}
                   </h2>
-                  <div className="flex items-center gap-2">
-                    <Star size={20} className="text-yellow-500 fill-current" />
-                    <span className="text-lg font-bold text-gray-800">
-                      {typeof profile.rating === 'number' ? profile.rating.toFixed(1) : 'N/A'}
-                    </span>
-                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -281,7 +287,7 @@ const UserProfile = () => {
             <div className="grid md:grid-cols-3 gap-6">
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600 mb-1">
-                  {typeof profile.rating === 'number' ? profile.rating.toFixed(1) : 'N/A'}
+                  {typeof profile.averageRating === 'number' ? profile.averageRating.toFixed(1) : 'N/A'}
                 </div>
                 <div className="text-sm text-gray-600">Average Rating</div>
               </div>
@@ -299,6 +305,11 @@ const UserProfile = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* User Ratings Section */}
+        <div className="mt-8">
+          <UserRatings userId={id} />
         </div>
       </div>
       {showRequestModal && (

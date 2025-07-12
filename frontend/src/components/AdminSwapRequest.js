@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   Search,
@@ -8,90 +8,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-
-// Sample data for demonstration
-const profiles = [
-  {
-    id: 1,
-    name: 'Marc Demo',
-    photo: '',
-    skillsOffered: ['Guitar', 'Cooking'],
-    skillsWanted: ['French', 'Yoga'],
-    rating: 3.8,
-    public: true,
-    status: 'pending',
-  },
-  {
-    id: 2,
-    name: 'Michell',
-    photo: '',
-    skillsOffered: ['Painting'],
-    skillsWanted: ['Coding'],
-    rating: 2.5,
-    public: true,
-    status: 'success',
-  },
-  {
-    id: 3,
-    name: 'Joe Vills',
-    photo: '',
-    skillsOffered: ['Yoga'],
-    skillsWanted: ['Guitar'],
-    rating: 4.0,
-    public: true,
-    status: 'reject',
-  },
-  {
-    id: 4,
-    name: 'Sara Lee',
-    photo: '',
-    skillsOffered: ['Coding', 'Public Speaking'],
-    skillsWanted: ['Painting'],
-    rating: 4.7,
-    public: true,
-    status: 'pending',
-  },
-  {
-    id: 5,
-    name: 'Alex Kim',
-    photo: '',
-    skillsOffered: ['French', 'Yoga'],
-    skillsWanted: ['Cooking'],
-    rating: 3.2,
-    public: true,
-    status: 'success',
-  },
-  {
-    id: 6,
-    name: 'Priya Singh',
-    photo: '',
-    skillsOffered: ['Cooking', 'Painting'],
-    skillsWanted: ['Public Speaking'],
-    rating: 4.9,
-    public: true,
-    status: 'reject',
-  },
-  {
-    id: 7,
-    name: 'John Doe',
-    photo: '',
-    skillsOffered: ['Coding', 'Yoga'],
-    skillsWanted: ['Guitar', 'French'],
-    rating: 4.3,
-    public: true,
-    status: 'pending',
-  },
-  {
-    id: 8,
-    name: 'Emily Carter',
-    photo: '',
-    skillsOffered: ['Public Speaking'],
-    skillsWanted: ['Painting', 'Yoga'],
-    rating: 3.6,
-    public: true,
-    status: 'success',
-  },
-];
+import { useNavigate } from 'react-router-dom';
 
 const statusOptions = ['All', 'pending', 'success', 'reject'];
 
@@ -99,18 +16,35 @@ const AdminSwapRequest = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [status, setStatus] = useState('All');
+  const [swapOffers, setSwapOffers] = useState([]);
   const profilesPerPage = 5;
   const isLoggedIn = true; // Replace with real auth logic
+  const navigate = useNavigate();
 
-  // Filtered and paginated profiles
-  const filteredProfiles = profiles.filter(
-    (p) =>
-      p.public &&
-      (status === 'All' || p.status === status) &&
-      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    const fetchSwapOffers = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/swap-offers');
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setSwapOffers(data.swapOffers || []);
+        }
+      } catch (err) {
+        setSwapOffers([]);
+      }
+    };
+    fetchSwapOffers();
+  }, []);
+
+  // Filtered and paginated offers
+  const filteredOffers = swapOffers.filter(
+    (offer) =>
+      (status === 'All' || offer.status === status) &&
+      ((offer.requesterId?.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (offer.requestedUserId?.username || '').toLowerCase().includes(searchQuery.toLowerCase()))
   );
-  const totalPages = Math.ceil(filteredProfiles.length / profilesPerPage);
-  const paginatedProfiles = filteredProfiles.slice(
+  const totalPages = Math.ceil(filteredOffers.length / profilesPerPage);
+  const paginatedOffers = filteredOffers.slice(
     (currentPage - 1) * profilesPerPage,
     currentPage * profilesPerPage
   );
@@ -129,7 +63,12 @@ const AdminSwapRequest = () => {
           </div>
           {/* Nav links */}
           <nav className="flex items-center space-x-2 md:space-x-6">
-            <button className="px-3 py-2 rounded-lg font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">Users</button>
+            <button
+              className="px-3 py-2 rounded-lg font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
+              onClick={() => navigate('/admindashboard')}
+            >
+              Users
+            </button>
             <button className="px-3 py-2 rounded-lg font-medium text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors">Swap request</button>
           </nav>
           {/* Profile */}
@@ -138,7 +77,11 @@ const AdminSwapRequest = () => {
               <User size={16} className="text-purple-600" />
             </div>
             <span className="text-gray-700 font-medium hidden sm:block">Admin</span>
-            <button onClick={() => window.location.reload()} className="text-gray-400 hover:text-purple-600 transition-colors" title="Logout">
+            <button onClick={() => {
+              localStorage.removeItem('userId');
+              localStorage.removeItem('token');
+              navigate('/login');
+            }} className="text-gray-400 hover:text-purple-600 transition-colors" title="Logout">
               <LogOut size={20} />
             </button>
           </div>
@@ -153,7 +96,7 @@ const AdminSwapRequest = () => {
             <Search className="text-gray-400 mr-2" size={20} />
             <input
               type="text"
-              placeholder="Search by name..."
+              placeholder="Search by user name..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full outline-none bg-transparent text-gray-700"
@@ -176,119 +119,81 @@ const AdminSwapRequest = () => {
           </div>
         </div>
 
-        {/* Profile Cards and Pagination Wrapper */}
+        {/* Swap Offers List */}
         <div className="flex-1 flex flex-col">
-          <div className="space-y-5 flex-1">
-            {paginatedProfiles.length === 0 && (
-              <div className="text-center text-gray-400 py-10">No profiles found.</div>
+          <div className="space-y-8 flex-1">
+            {paginatedOffers.length === 0 && (
+              <div className="text-center text-gray-400 py-10">No swap offers found.</div>
             )}
-            {/* Only render the new two-part, centered card layout */}
-            {paginatedProfiles.map(profile => (
-              <div key={profile.id} className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-stretch p-0 sm:p-0 transition-transform hover:scale-[1.01]">
-                {/* Left Part */}
-                <div className="flex-1 flex flex-col items-center justify-center py-6 px-2 sm:px-6 text-center">
-                  <span className="text-lg font-semibold text-gray-800 mb-2">{profile.name}</span>
-                  <div className="flex flex-col gap-1 w-full items-center">
-                    <div className="flex flex-row flex-wrap items-center justify-center gap-2 w-full">
-                      <span className="text-xs text-gray-500">Skills Offered:</span>
-                      {profile.skillsOffered.map(skill => (
-                        <span key={skill} className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
-                      ))}
-                    </div>
-                    <div className="flex flex-row flex-wrap items-center justify-center gap-2 w-full">
-                      <span className="text-xs text-gray-500">Skills Wanted:</span>
-                      {profile.skillsWanted.map(skill => (
-                        <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
-                      ))}
+            {paginatedOffers.map(offer => (
+              <div key={offer._id} className="bg-white rounded-2xl shadow-lg border border-gray-200 flex flex-col md:flex-row items-stretch p-6 gap-6 transition-transform hover:scale-[1.01]">
+                {/* Requester Info */}
+                <div className="flex-1 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-gray-100 pb-6 md:pb-0 md:pr-6">
+                  <div className="mb-3">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Requester</span>
+                    <div className="flex flex-col items-center">
+                      {offer.requesterId?.profilePhoto ? (
+                        <img src={offer.requesterId.profilePhoto} alt="avatar" className="w-16 h-16 rounded-full object-cover shadow" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center text-2xl font-bold text-purple-600 shadow">
+                          {offer.requesterId?.username?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                      )}
+                      <span className="mt-2 text-base font-bold text-purple-700">{offer.requesterId?.username}</span>
+                      <span className="text-xs text-gray-400">{offer.requesterId?.firstName} {offer.requesterId?.lastName}</span>
                     </div>
                   </div>
-                </div>
-                {/* Center Status Button */}
-                <div className="flex flex-col items-center justify-center px-2 sm:px-0">
-                  <button
-                    disabled
-                    className={`px-5 py-2 rounded-lg font-semibold transition-colors shadow text-xs sm:text-sm
-                      ${
-                        profile.status === 'success'
-                          ? 'bg-green-500 text-white'
-                          : profile.status === 'reject'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-yellow-400 text-white'
-                      }
-                      opacity-90 cursor-not-allowed mt-4 mb-4 sm:mt-0 sm:mb-0
-                    `}
-                  >
-                    {profile.status === 'success'
-                      ? 'Accepted'
-                      : profile.status === 'reject'
-                      ? 'Rejected'
-                      : 'Pending'}
-                  </button>
-                </div>
-                {/* Vertical Divider removed */}
-                {/* Right Part */}
-                <div className="flex-1 flex flex-col items-center justify-center py-6 px-2 sm:px-6 text-center">
-                  <span className="text-lg font-semibold text-gray-800 mb-2">{profile.name}</span>
-                  <div className="flex flex-col gap-1 w-full items-center">
-                    <div className="flex flex-row flex-wrap items-center justify-center gap-2 w-full">
-                      <span className="text-xs text-gray-500">Skills Offered:</span>
-                      {profile.skillsOffered.map(skill => (
-                        <span key={skill} className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
-                      ))}
-                    </div>
-                    <div className="flex flex-row flex-wrap items-center justify-center gap-2 w-full">
-                      <span className="text-xs text-gray-500">Skills Wanted:</span>
-                      {profile.skillsWanted.map(skill => (
-                        <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {paginatedProfiles.map(profile => (
-              <div key={profile.id} className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-stretch p-0 sm:p-0 transition-transform hover:scale-[1.01]">
-                {/* Left Part */}
-                <div className="flex-1 flex flex-col items-center justify-center py-6 px-2 sm:px-6 text-center">
-                  <span className="text-base font-bold text-purple-700 mb-2">{profile.name}</span>
-                  <div className="mb-1">
+                  <div>
                     <span className="block text-xs text-gray-500 mb-1">Skills Offered</span>
                     <div className="flex flex-wrap gap-2 justify-center">
-                      {profile.skillsOffered.map(skill => (
-                        <span key={skill} className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
+                      {offer.offeredSkills?.split(',').map(skill => (
+                        <span key={skill} className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">{skill.trim()}</span>
                       ))}
+                    </div>
+                  </div>
+                </div>
+                {/* Requested User Info */}
+                <div className="flex-1 flex flex-col items-center justify-center text-center border-b md:border-b-0 md:border-r border-gray-100 pb-6 md:pb-0 md:pr-6">
+                  <div className="mb-3">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Requested User</span>
+                    <div className="flex flex-col items-center">
+                      {offer.requestedUserId?.profilePhoto ? (
+                        <img src={offer.requestedUserId.profilePhoto} alt="avatar" className="w-16 h-16 rounded-full object-cover shadow" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl font-bold text-indigo-600 shadow">
+                          {offer.requestedUserId?.username?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                      )}
+                      <span className="mt-2 text-base font-bold text-indigo-700">{offer.requestedUserId?.username}</span>
+                      <span className="text-xs text-gray-400">{offer.requestedUserId?.firstName} {offer.requestedUserId?.lastName}</span>
                     </div>
                   </div>
                   <div>
                     <span className="block text-xs text-gray-500 mb-1">Skills Wanted</span>
                     <div className="flex flex-wrap gap-2 justify-center">
-                      {profile.skillsWanted.map(skill => (
-                        <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
+                      {offer.wantedSkills?.split(',').map(skill => (
+                        <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill.trim()}</span>
                       ))}
                     </div>
                   </div>
                 </div>
-                {/* Vertical Divider */}
-                <div className="hidden sm:block w-px bg-gray-200 my-6"></div>
-                {/* Right Part */}
-                <div className="flex-1 flex flex-col items-center justify-center py-6 px-2 sm:px-6 text-center">
-                  <span className="text-base font-bold text-purple-700 mb-2">{profile.name}</span>
-                  <div className="mb-1">
-                    <span className="block text-xs text-gray-500 mb-1">Skills Offered</span>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {profile.skillsOffered.map(skill => (
-                        <span key={skill} className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
-                      ))}
+                {/* Status & Details */}
+                <div className="flex flex-col items-center justify-center min-w-[140px] px-2">
+                  <span className={`px-5 py-2 rounded-lg font-semibold transition-colors shadow text-xs sm:text-sm mb-4 ${
+                    offer.status === 'success'
+                      ? 'bg-green-500 text-white'
+                      : offer.status === 'reject'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-yellow-400 text-white'
+                  }`}>
+                    {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
+                  </span>
+                  <div className="text-xs text-gray-400 mb-2">Created: {new Date(offer.createdAt).toLocaleString()}</div>
+                  {offer.message && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs text-gray-700 max-w-[180px] break-words">
+                      <span className="font-medium text-gray-500">Message:</span> {offer.message}
                     </div>
-                  </div>
-                  <div>
-                    <span className="block text-xs text-gray-500 mb-1">Skills Wanted</span>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {profile.skillsWanted.map(skill => (
-                        <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
-                      ))}
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ))}

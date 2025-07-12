@@ -145,12 +145,19 @@ const Dashboard = () => {
               </div>
               {/* Info */}
               <div className="flex-1 flex flex-col justify-center">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-col items-start mb-1">
+                  <div className="flex items-center gap-1 mb-1">
+                    <Star size={16} className="text-yellow-500" />
+                    <span className="text-base font-bold text-gray-800">
+                      {typeof profile.averageRating === 'number' ? profile.averageRating.toFixed(1) : 'N/A'}
+                    </span>
+                    {profile.totalRatings > 0 && (
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({profile.totalRatings} {profile.totalRatings === 1 ? 'rating' : 'ratings'})
+                      </span>
+                    )}
+                  </div>
                   <span className="text-lg font-semibold text-gray-800">{profile.username}</span>
-                  <span className="flex items-center text-yellow-500 ml-2">
-                    <Star size={16} className="mr-1" />
-                    <span className="text-sm font-medium">{typeof profile.rating === 'number' ? profile.rating.toFixed(1) : 'N/A'}</span>
-                  </span>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-1">
                   <span className="text-xs text-gray-500 py-1">Skills Offered:</span>

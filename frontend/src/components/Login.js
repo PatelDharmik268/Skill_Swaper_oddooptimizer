@@ -33,6 +33,14 @@ const Login = () => {
         }),
       });
       const data = await response.json();
+      if (
+        formData.email === 'admin@example.com' &&
+        formData.password === 'admin123'
+      ) {
+        // Redirect admin to admin dashboard
+        navigate('/admindashboard');
+        return;
+      }
       if (response.ok && data.success) {
         // Store user ID and token in localStorage
         if (data.user && data.user._id) {

@@ -207,6 +207,81 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// @route   PUT /api/swap-offers/:id/complete
+// @desc    Mark a swap offer as completed by a user
+// @access  Public (for testing)
+router.put('/:id/complete', [
+  body('userId')
+    .isMongoId()
+    .withMessage('User ID must be a valid MongoDB ObjectId')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid swap offer ID format'
+      });
+    }
+
+    const swapOffer = await SwapOffer.findById(id);
+
+    if (!swapOffer || !swapOffer.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Swap offer not found'
+      });
+    }
+
+    // Check if user is part of this swap
+    if (swapOffer.requesterId.toString() !== userId && swapOffer.requestedUserId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to complete this swap offer'
+      });
+    }
+
+    // Only allow completion if offer is accepted
+    if (swapOffer.status !== 'accepted') {
+      return res.status(400).json({
+        success: false,
+        message: 'Can only complete accepted offers'
+      });
+    }
+
+    // Mark completion for the user
+    swapOffer.markCompletion(userId);
+    await swapOffer.save();
+
+    // Populate user data for response
+    await swapOffer.getOfferWithUsers();
+
+    res.json({
+      success: true,
+      message: 'Swap completion marked successfully',
+      swapOffer
+    });
+
+  } catch (error) {
+    console.error('Mark completion error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while marking completion'
+    });
+  }
+});
+
 // @route   PUT /api/swap-offers/:id/status
 // @desc    Update swap offer status (accept/reject/cancel)
 // @access  Public (for testing)
@@ -486,6 +561,238 @@ router.get('/users/available', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error while fetching available users'
+    });
+  }
+});
+
+// @route   POST /api/swap-offers/:id/feedback
+// @desc    Submit feedback and rating for a completed swap
+// @access  Public (for testing)
+router.post('/:id/feedback', [
+  body('userId')
+    .isMongoId()
+    .withMessage('User ID must be a valid MongoDB ObjectId'),
+  body('rating')
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Rating must be between 1 and 5'),
+  body('feedback')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Feedback cannot exceed 1000 characters')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { userId, rating, feedback } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid swap offer ID format'
+      });
+    }
+
+    const swapOffer = await SwapOffer.findById(id);
+
+    if (!swapOffer || !swapOffer.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Swap offer not found'
+      });
+    }
+
+    // Check if user is part of this swap
+    if (swapOffer.requesterId.toString() !== userId && swapOffer.requestedUserId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to submit feedback for this swap offer'
+      });
+    }
+
+    // Only allow feedback for completed offers
+    if (swapOffer.status !== 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Can only submit feedback for completed offers'
+      });
+    }
+
+    // Check if user has already given feedback
+    const hasGivenFeedback = swapOffer.requesterId.toString() === userId 
+      ? swapOffer.feedbackGiven.requesterFeedback 
+      : swapOffer.feedbackGiven.requestedUserFeedback;
+
+    if (hasGivenFeedback) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already submitted feedback for this swap'
+      });
+    }
+
+    // Determine which user to rate (the other user in the swap)
+    const userToRateId = swapOffer.requesterId.toString() === userId 
+      ? swapOffer.requestedUserId 
+      : swapOffer.requesterId;
+
+    // Add rating to the user being rated
+    const userToRate = await User.findById(userToRateId);
+    if (!userToRate) {
+      return res.status(404).json({
+        success: false,
+        message: 'User to rate not found'
+      });
+    }
+
+    userToRate.addRating(rating, feedback || '', userId, swapOffer._id);
+    await userToRate.save();
+
+    // Mark feedback as given in the swap offer
+    swapOffer.markFeedbackGiven(userId);
+    await swapOffer.save();
+
+    // Populate user data for response
+    await swapOffer.getOfferWithUsers();
+
+    res.json({
+      success: true,
+      message: 'Feedback submitted successfully',
+      swapOffer,
+      updatedUserRating: {
+        averageRating: userToRate.averageRating,
+        totalRatings: userToRate.totalRatings
+      }
+    });
+
+  } catch (error) {
+    console.error('Submit feedback error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while submitting feedback'
+    });
+  }
+});
+
+// @route   GET /api/swap-offers/user/:userId/needing-feedback
+// @desc    Get completed swap offers that need feedback from a user
+// @access  Public (for testing)
+router.get('/user/:userId/needing-feedback', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+    }
+
+    const swapOffers = await SwapOffer.getCompletedOffersNeedingFeedback(userId);
+
+    res.json({
+      success: true,
+      message: 'Swap offers needing feedback retrieved successfully',
+      swapOffers
+    });
+
+  } catch (error) {
+    console.error('Get offers needing feedback error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching offers needing feedback'
+    });
+  }
+});
+
+// @route   GET /api/users/:userId/ratings
+// @desc    Get all ratings and feedback for a user
+// @access  Public
+router.get('/users/:userId/ratings', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 10, page = 1 } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get paginated rating history with populated user data
+    const ratingHistory = await User.aggregate([
+      { $match: { _id: user._id } },
+      { $unwind: '$ratingHistory' },
+      { $sort: { 'ratingHistory.createdAt': -1 } },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'ratingHistory.fromUserId',
+          foreignField: '_id',
+          as: 'fromUser'
+        }
+      },
+      {
+        $lookup: {
+          from: 'swapoffers',
+          localField: 'ratingHistory.swapOfferId',
+          foreignField: '_id',
+          as: 'swapOffer'
+        }
+      },
+      {
+        $project: {
+          rating: '$ratingHistory.rating',
+          feedback: '$ratingHistory.feedback',
+          createdAt: '$ratingHistory.createdAt',
+          fromUser: { $arrayElemAt: ['$fromUser', 0] },
+          swapOffer: { $arrayElemAt: ['$swapOffer', 0] }
+        }
+      }
+    ]);
+
+    const total = user.ratingHistory.length;
+
+    res.json({
+      success: true,
+      message: 'User ratings retrieved successfully',
+      ratings: ratingHistory,
+      userStats: {
+        averageRating: user.averageRating,
+        totalRatings: user.totalRatings
+      },
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user ratings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching user ratings'
     });
   }
 });

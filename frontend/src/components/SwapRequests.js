@@ -11,12 +11,16 @@ import {
   Inbox,
   Check,
   X,
-  Clock
+  Clock,
+  CheckCircle,
+  MessageSquare
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import NavBar from './NavBar';
+import FeedbackForm from './FeedbackForm';
 
-const statusOptions = ['All', 'pending', 'accepted', 'rejected', 'cancelled'];
+const statusOptions = ['All', 'pending', 'accepted', 'rejected', 'cancelled', 'completed'];
 const typeOptions = ['All', 'sent', 'received'];
 
 const SwapRequests = () => {
@@ -29,6 +33,8 @@ const SwapRequests = () => {
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({});
   const [user, setUser] = useState(null);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [selectedSwapOffer, setSelectedSwapOffer] = useState(null);
   const navigate = useNavigate();
   const itemsPerPage = 5;
 
@@ -148,6 +154,42 @@ const SwapRequests = () => {
     }
   };
 
+  const handleMarkComplete = async (offerId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/swap-offers/${offerId}/complete`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user._id
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        toast.success('Swap marked as completed!');
+        fetchSwapOffers();
+      } else {
+        toast.error(data.message || 'Failed to mark as completed');
+      }
+    } catch (err) {
+      console.error('Error marking complete:', err);
+      toast.error('Failed to mark as completed');
+    }
+  };
+
+  const handleOpenFeedback = (swapOffer) => {
+    setSelectedSwapOffer(swapOffer);
+    setShowFeedbackForm(true);
+  };
+
+  const handleFeedbackSuccess = (updatedRating) => {
+    // Refresh the swap offers to show updated status
+    fetchSwapOffers();
+  };
+
   // Helper to parse skills string to array
   const parseSkills = (skillsString) => {
     if (!skillsString || typeof skillsString !== 'string') return [];
@@ -164,6 +206,7 @@ const SwapRequests = () => {
       case 'accepted': return 'bg-green-500 text-white';
       case 'rejected': return 'bg-red-500 text-white';
       case 'cancelled': return 'bg-gray-500 text-white';
+      case 'completed': return 'bg-blue-500 text-white';
       default: return 'bg-yellow-400 text-white';
     }
   };
@@ -173,6 +216,7 @@ const SwapRequests = () => {
       case 'accepted': return 'Accepted';
       case 'rejected': return 'Rejected';
       case 'cancelled': return 'Cancelled';
+      case 'completed': return 'Completed';
       default: return 'Pending';
     }
   };
@@ -182,6 +226,7 @@ const SwapRequests = () => {
       case 'accepted': return <Check size={16} />;
       case 'rejected': return <X size={16} />;
       case 'cancelled': return <X size={16} />;
+      case 'completed': return <CheckCircle size={16} />;
       default: return <Clock size={16} />;
     }
   };
@@ -323,6 +368,12 @@ const SwapRequests = () => {
                     {getStatusText(offer.status)}
                   </div>
                   
+                  {offer.status === 'completed' && (
+                    <div className="text-xs text-green-600 font-medium">
+                      Ready for Rating
+                    </div>
+                  )}
+                  
                   {offer.status === 'pending' && !isRequester && (
                     <div className="flex gap-2">
                       <button
@@ -348,8 +399,27 @@ const SwapRequests = () => {
                       Cancel
                     </button>
                   )}
+
+                  {offer.status === 'accepted' && (
+                    <button
+                      onClick={() => handleMarkComplete(offer._id)}
+                      className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
+                    >
+                      Mark Complete
+                    </button>
+                  )}
+
+                  {offer.status === 'completed' && (
+                    <button
+                      onClick={() => handleOpenFeedback(offer)}
+                      className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition-colors flex items-center gap-1"
+                    >
+                      <MessageSquare size={14} />
+                      Rate & Review
+                    </button>
+                  )}
                   
-                  {(offer.status === 'accepted' || offer.status === 'rejected' || offer.status === 'cancelled') && (
+                  {(offer.status === 'accepted' || offer.status === 'rejected' || offer.status === 'cancelled' || offer.status === 'completed') && (
                     <button
                       onClick={() => handleDelete(offer._id)}
                       className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors"
@@ -394,6 +464,17 @@ const SwapRequests = () => {
           </div>
         )}
       </div>
+
+      {/* Feedback Form */}
+      {showFeedbackForm && selectedSwapOffer && (
+        <FeedbackForm
+          userId={selectedSwapOffer.otherUser._id}
+          swapOfferId={selectedSwapOffer._id}
+          fromUserId={user._id}
+          onClose={() => setShowFeedbackForm(false)}
+          onSuccess={handleFeedbackSuccess}
+        />
+      )}
     </NavBar>
   );
 };

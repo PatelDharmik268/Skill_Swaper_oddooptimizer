@@ -31,12 +31,37 @@ const swapOfferSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'cancelled'],
+    enum: ['pending', 'accepted', 'rejected', 'cancelled', 'completed'],
     default: 'pending'
   },
   isActive: {
     type: Boolean,
     default: true
+  },
+  // Completion and feedback fields
+  completionStatus: {
+    requesterCompleted: {
+      type: Boolean,
+      default: false
+    },
+    requestedUserCompleted: {
+      type: Boolean,
+      default: false
+    }
+  },
+  feedbackGiven: {
+    requesterFeedback: {
+      type: Boolean,
+      default: false
+    },
+    requestedUserFeedback: {
+      type: Boolean,
+      default: false
+    }
+  },
+  completedAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true
@@ -52,11 +77,43 @@ swapOfferSchema.virtual('isPending').get(function() {
   return this.status === 'pending' && this.isActive;
 });
 
+// Virtual for checking if both users have completed the swap
+swapOfferSchema.virtual('isFullyCompleted').get(function() {
+  return this.completionStatus.requesterCompleted && this.completionStatus.requestedUserCompleted;
+});
+
+// Virtual for checking if both users have given feedback
+swapOfferSchema.virtual('isFullyRated').get(function() {
+  return this.feedbackGiven.requesterFeedback && this.feedbackGiven.requestedUserFeedback;
+});
+
 // Method to get offer details with populated user data
 swapOfferSchema.methods.getOfferWithUsers = async function() {
   await this.populate('requesterId', 'username firstName lastName profilePhoto');
   await this.populate('requestedUserId', 'username firstName lastName profilePhoto');
   return this;
+};
+
+// Method to mark completion for a user
+swapOfferSchema.methods.markCompletion = function(userId) {
+  if (this.requesterId.toString() === userId) {
+    this.completionStatus.requesterCompleted = true;
+  } else if (this.requestedUserId.toString() === userId) {
+    this.completionStatus.requestedUserCompleted = true;
+  }
+  
+  // Mark as completed when either user completes (allows for rating)
+  this.status = 'completed';
+  this.completedAt = new Date();
+};
+
+// Method to mark feedback given for a user
+swapOfferSchema.methods.markFeedbackGiven = function(userId) {
+  if (this.requesterId.toString() === userId) {
+    this.feedbackGiven.requesterFeedback = true;
+  } else if (this.requestedUserId.toString() === userId) {
+    this.feedbackGiven.requestedUserFeedback = true;
+  }
 };
 
 // Static method to get offers by user (as requester or requested)
@@ -79,6 +136,21 @@ swapOfferSchema.statics.getPendingOffersForUser = async function(userId) {
     .sort({ createdAt: -1 });
 };
 
+// Static method to get completed offers that need feedback
+swapOfferSchema.statics.getCompletedOffersNeedingFeedback = async function(userId) {
+  return await this.find({
+    $or: [{ requesterId: userId }, { requestedUserId: userId }],
+    status: 'completed',
+    isActive: true,
+    $or: [
+      { 'feedbackGiven.requesterFeedback': false, requesterId: userId },
+      { 'feedbackGiven.requestedUserFeedback': false, requestedUserId: userId }
+    ]
+  }).populate('requesterId', 'username firstName lastName profilePhoto')
+    .populate('requestedUserId', 'username firstName lastName profilePhoto')
+    .sort({ completedAt: -1 });
+};
+
 // Static method to get all offers for a user with metadata
 swapOfferSchema.statics.getOffersForUserWithMetadata = async function(userId, options = {}) {
   const { status, type, limit = 20, page = 1 } = options;
@@ -89,7 +161,7 @@ swapOfferSchema.statics.getOffersForUserWithMetadata = async function(userId, op
   };
 
   // Filter by status
-  if (status && ['pending', 'accepted', 'rejected', 'cancelled'].includes(status)) {
+  if (status && ['pending', 'accepted', 'rejected', 'cancelled', 'completed'].includes(status)) {
     query.status = status;
   }
 

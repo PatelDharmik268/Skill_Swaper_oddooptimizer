@@ -74,7 +74,46 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
-  }
+  },
+  // Rating fields
+  averageRating: {
+    type: Number,
+    default: 0,
+    min: [0, 'Average rating cannot be negative'],
+    max: [5, 'Average rating cannot exceed 5']
+  },
+  totalRatings: {
+    type: Number,
+    default: 0,
+    min: [0, 'Total ratings cannot be negative']
+  },
+  ratingHistory: [{
+    rating: {
+      type: Number,
+      required: true,
+      min: [1, 'Rating must be at least 1'],
+      max: [5, 'Rating cannot exceed 5']
+    },
+    feedback: {
+      type: String,
+      trim: true,
+      maxlength: [1000, 'Feedback cannot exceed 1000 characters']
+    },
+    fromUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    swapOfferId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SwapOffer',
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });
@@ -108,6 +147,30 @@ userSchema.methods.getPublicProfile = function() {
   delete userObject.password;
   delete userObject.__v;
   return userObject;
+};
+
+// Method to update average rating
+userSchema.methods.updateAverageRating = function() {
+  if (this.ratingHistory.length === 0) {
+    this.averageRating = 0;
+    this.totalRatings = 0;
+    return;
+  }
+  
+  const totalRating = this.ratingHistory.reduce((sum, rating) => sum + rating.rating, 0);
+  this.averageRating = totalRating / this.ratingHistory.length;
+  this.totalRatings = this.ratingHistory.length;
+};
+
+// Method to add a new rating
+userSchema.methods.addRating = function(rating, feedback, fromUserId, swapOfferId) {
+  this.ratingHistory.push({
+    rating,
+    feedback,
+    fromUserId,
+    swapOfferId
+  });
+  this.updateAverageRating();
 };
 
 module.exports = mongoose.model('User', userSchema); 
