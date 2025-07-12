@@ -18,8 +18,8 @@ const profiles = [
     skillsOffered: ['Guitar', 'Cooking'],
     skillsWanted: ['French', 'Yoga'],
     rating: 3.8,
-    availability: 'Weekends',
     public: true,
+    status: 'pending',
   },
   {
     id: 2,
@@ -28,8 +28,8 @@ const profiles = [
     skillsOffered: ['Painting'],
     skillsWanted: ['Coding'],
     rating: 2.5,
-    availability: 'Evenings',
     public: true,
+    status: 'success',
   },
   {
     id: 3,
@@ -38,8 +38,8 @@ const profiles = [
     skillsOffered: ['Yoga'],
     skillsWanted: ['Guitar'],
     rating: 4.0,
-    availability: 'Mornings',
     public: true,
+    status: 'reject',
   },
   {
     id: 4,
@@ -48,8 +48,8 @@ const profiles = [
     skillsOffered: ['Coding', 'Public Speaking'],
     skillsWanted: ['Painting'],
     rating: 4.7,
-    availability: 'Mornings',
     public: true,
+    status: 'pending',
   },
   {
     id: 5,
@@ -58,8 +58,8 @@ const profiles = [
     skillsOffered: ['French', 'Yoga'],
     skillsWanted: ['Cooking'],
     rating: 3.2,
-    availability: 'Evenings',
     public: true,
+    status: 'success',
   },
   {
     id: 6,
@@ -68,8 +68,8 @@ const profiles = [
     skillsOffered: ['Cooking', 'Painting'],
     skillsWanted: ['Public Speaking'],
     rating: 4.9,
-    availability: 'Weekends',
     public: true,
+    status: 'reject',
   },
   {
     id: 7,
@@ -78,8 +78,8 @@ const profiles = [
     skillsOffered: ['Coding', 'Yoga'],
     skillsWanted: ['Guitar', 'French'],
     rating: 4.3,
-    availability: 'Evenings',
     public: true,
+    status: 'pending',
   },
   {
     id: 8,
@@ -88,17 +88,17 @@ const profiles = [
     skillsOffered: ['Public Speaking'],
     skillsWanted: ['Painting', 'Yoga'],
     rating: 3.6,
-    availability: 'Weekends',
     public: true,
+    status: 'success',
   },
 ];
 
-const availabilities = ['All', 'Mornings', 'Evenings', 'Weekends'];
+const statusOptions = ['All', 'pending', 'success', 'reject'];
 
-const Dashboard = () => {
+const SwapRequests = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [availability, setAvailability] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
+  const [status, setStatus] = useState('All');
   const profilesPerPage = 5;
   const isLoggedIn = true; // Replace with real auth logic
 
@@ -106,7 +106,7 @@ const Dashboard = () => {
   const filteredProfiles = profiles.filter(
     (p) =>
       p.public &&
-      (availability === 'All' || p.availability === availability) &&
+      (status === 'All' || p.status === status) &&
       p.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
   const totalPages = Math.ceil(filteredProfiles.length / profilesPerPage);
@@ -114,8 +114,6 @@ const Dashboard = () => {
     (currentPage - 1) * profilesPerPage,
     currentPage * profilesPerPage
   );
-
-  // Responsive: mobile menu toggle (future)
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -149,7 +147,7 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-2 sm:px-4 py-6 flex flex-col">
-        {/* Search and Filter */}
+        {/* Search and Status Dropdown */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div className="flex items-center w-full sm:w-auto bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm">
             <Search className="text-gray-400 mr-2" size={20} />
@@ -162,15 +160,15 @@ const Dashboard = () => {
             />
           </div>
           <div className="flex items-center space-x-2">
-            <span className="text-gray-500 text-sm">Availability:</span>
+            <span className="text-gray-500 text-sm">Status:</span>
             <div className="relative">
               <select
-                value={availability}
-                onChange={e => setAvailability(e.target.value)}
+                value={status}
+                onChange={e => { setStatus(e.target.value); setCurrentPage(1); }}
                 className="appearance-none bg-white border border-gray-200 rounded-lg px-3 py-2 pr-8 text-gray-700 focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
               >
-                {availabilities.map(a => (
-                  <option key={a} value={a}>{a}</option>
+                {statusOptions.map(s => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
@@ -211,20 +209,28 @@ const Dashboard = () => {
                       <span key={skill} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs font-medium">{skill}</span>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-400">Availability:</span>
-                    <span className="text-xs text-gray-700 font-medium">{profile.availability}</span>
-                  </div>
                 </div>
-                {/* Request Button */}
+                {/* Status Button */}
                 <div className="flex flex-col justify-center items-center gap-2">
                   <button
-                    className={`px-5 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow ${!isLoggedIn ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    disabled={!isLoggedIn}
+                    disabled
+                    className={`px-5 py-2 rounded-lg font-semibold transition-colors shadow
+                      ${
+                        profile.status === 'success'
+                          ? 'bg-green-500 text-white'
+                          : profile.status === 'reject'
+                          ? 'bg-red-500 text-white'
+                          : 'bg-yellow-400 text-white'
+                      }
+                      opacity-70 cursor-not-allowed
+                    `}
                   >
-                    Request
+                    {profile.status === 'success'
+                      ? 'Accepted'
+                      : profile.status === 'reject'
+                      ? 'Rejected'
+                      : 'Pending'}
                   </button>
-                  <span className="text-xs text-gray-400">{isLoggedIn ? '' : 'Login to request'}</span>
                 </div>
               </div>
             ))}
@@ -266,4 +272,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default SwapRequests;
