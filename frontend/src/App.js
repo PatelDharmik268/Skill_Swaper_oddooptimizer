@@ -17,7 +17,7 @@ function App() {
   return (
     <div className="App">
       {isAuthenticated ? (
-        <Dashboard onLogout={handleLogout} />
+        <Dashboard />
       ) : (
         <Login onLogin={handleLogin} />
       )}

@@ -93,7 +93,7 @@ const Dashboard = () => {
                 </div>
                 <span className="text-gray-700 font-medium">Admin</span>
                 <button 
-                  onClick={onLogout}
+                  onClick={() => window.location.reload()}
                   className="text-sm text-gray-500 hover:text-purple-600 transition-colors"
                 >
                   Logout
