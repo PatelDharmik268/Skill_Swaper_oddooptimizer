@@ -141,7 +141,7 @@ router.post('/register', upload.single('profilePhoto'), [
 // @route   POST /api/auth/login
 // @desc    Authenticate user & get token
 // @access  Public
-router.post('/login', [
+router.post('/login', multer().none(), [
   body('email')
     .isEmail()
     .withMessage('Please enter a valid email'),
