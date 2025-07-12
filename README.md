@@ -37,7 +37,7 @@ Skillswap/
 
 ### 1. Clone the repository
 ```bash
-git clone <your-repo-url>
+git clone [<your-repo-url>](https://github.com/PatelDharmik268/Skill_Swaper_oddooptimizer)
 cd Skillswap
 ```
 
