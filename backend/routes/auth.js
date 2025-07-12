@@ -1,7 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const User = require('../models/user');
+const User = require('../models/User');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -27,11 +27,13 @@ router.post('/register', upload.single('profilePhoto'), [
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters long'),
   body('firstName')
-    .notEmpty()
-    .withMessage('First name is required'),
+    .optional()
+    .isString()
+    .withMessage('First name must be a string'),
   body('lastName')
-    .notEmpty()
-    .withMessage('Last name is required'),
+    .optional()
+    .isString()
+    .withMessage('Last name must be a string'),
   body('location')
     .optional()
     .isLength({ max: 100 })
@@ -103,8 +105,8 @@ router.post('/register', upload.single('profilePhoto'), [
       username,
       email,
       password,
-      firstName,
-      lastName,
+      firstName: firstName || '',
+      lastName: lastName || '',
       location: location || '',
       profilePhoto: profilePhoto || null,
       skillsOffered: skillsOfferedStr,

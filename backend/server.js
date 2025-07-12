@@ -58,8 +58,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Export upload for use in routes
-toBase64 = (buffer, mimetype) => `data:${mimetype};base64,${buffer.toString('base64')}`;
+// Export toBase64 function for use in routes
+const toBase64 = (buffer, mimetype) => `data:${mimetype};base64,${buffer.toString('base64')}`;
 app.set('toBase64', toBase64);
 
 // Start server
