@@ -29,6 +29,7 @@ const Dashboard = () => {
   const profilesPerPage = 5;
   const isLoggedIn = true; // Replace with real auth logic
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Fetch current user for avatar
@@ -56,6 +57,7 @@ const Dashboard = () => {
           setUsers(data.users);
         }
       } catch (err) {}
+      setLoading(false);
     };
     fetchUsers();
   }, []);
@@ -124,13 +126,17 @@ const Dashboard = () => {
       {/* Profile Cards and Pagination Wrapper */}
       <div className="flex-1 flex flex-col">
         <div className="space-y-5 flex-1">
-          {paginatedProfiles.length === 0 && (
+          {loading ? (
+            <div className="flex justify-center items-center py-10">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-300 border-t-purple-600"></div>
+            </div>
+          ) : paginatedProfiles.length === 0 ? (
             <div className="text-center text-gray-400 py-10">No profiles found.</div>
-          )}
+          ) : null}
           {paginatedProfiles.map(profile => (
-            <div key={profile.id} className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-center sm:items-stretch p-4 sm:p-6 gap-4 sm:gap-8 transition-transform hover:scale-[1.01]">
+            <div key={profile._id || profile.id} className="bg-white rounded-xl shadow-md border border-gray-200 flex flex-col sm:flex-row items-center sm:items-stretch p-4 sm:p-6 gap-4 sm:gap-8 transition-transform hover:scale-[1.01]">
               {/* Profile Photo */}
-              <div className="flex-shrink-0 flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full text-3xl font-bold text-purple-600">
+              <div className="flex-shrink-0 flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full">
                 {profile.profilePhoto ? (
                   <img src={profile.profilePhoto} alt="Profile" className="w-20 h-20 rounded-full object-cover" />
                 ) : (
@@ -168,10 +174,11 @@ const Dashboard = () => {
                 <button
                   className={`px-5 py-2 rounded-lg font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-colors shadow ${!isLoggedIn ? 'opacity-50 cursor-not-allowed' : ''}`}
                   disabled={!isLoggedIn}
+                  onClick={() => navigate(`/user/${profile._id}`)}
                 >
                   Request
                 </button>
-                <span className="text-xs text-gray-400">{isLoggedIn ? '' : 'Login to request'}</span>
+                <span className="text-xs text-gray-400">{!isLoggedIn ? 'Login to request' : ''}</span>
               </div>
             </div>
           ))}

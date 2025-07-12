@@ -79,4 +79,47 @@ swapOfferSchema.statics.getPendingOffersForUser = async function(userId) {
     .sort({ createdAt: -1 });
 };
 
+// Static method to get all offers for a user with metadata
+swapOfferSchema.statics.getOffersForUserWithMetadata = async function(userId, options = {}) {
+  const { status, type, limit = 20, page = 1 } = options;
+  
+  let query = { 
+    isActive: true,
+    $or: [{ requesterId: userId }, { requestedUserId: userId }]
+  };
+
+  // Filter by status
+  if (status && ['pending', 'accepted', 'rejected', 'cancelled'].includes(status)) {
+    query.status = status;
+  }
+
+  // Filter by type (sent or received)
+  if (type === 'sent') {
+    query = { ...query, requesterId: userId };
+  } else if (type === 'received') {
+    query = { ...query, requestedUserId: userId };
+  }
+
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  
+  const swapOffers = await this.find(query)
+    .populate('requesterId', 'username firstName lastName profilePhoto')
+    .populate('requestedUserId', 'username firstName lastName profilePhoto')
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit))
+    .skip(skip);
+
+  // Add metadata to each offer
+  const offersWithMetadata = swapOffers.map(offer => {
+    const isRequester = offer.requesterId._id.toString() === userId;
+    return {
+      ...offer.toObject(),
+      userRole: isRequester ? 'requester' : 'requested',
+      otherUser: isRequester ? offer.requestedUserId : offer.requesterId
+    };
+  });
+
+  return offersWithMetadata;
+};
+
 module.exports = mongoose.model('SwapOffer', swapOfferSchema); 

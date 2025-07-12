@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -58,9 +59,7 @@ const Login = () => {
         {/* Header */}
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg transition-transform duration-200 hover:scale-105">
-              <Sparkles className="text-white" size={32} />
-            </div>
+            <img src={logo} alt="Logo" className="w-16 h-16 rounded-2xl shadow-lg object-cover transition-transform duration-200 hover:scale-105" />
           </div>
           <h2 className="text-3xl font-bold text-gray-800 transition-opacity duration-300">
             Welcome Back

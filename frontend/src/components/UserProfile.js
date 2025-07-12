@@ -1,0 +1,357 @@
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { User, MapPin, Star, Clock, X, ChevronLeft } from 'lucide-react';
+import { toast } from 'react-toastify';
+
+const UserProfile = () => {
+  const { id } = useParams();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [selectedMySkill, setSelectedMySkill] = useState('');
+  const [selectedTheirSkill, setSelectedTheirSkill] = useState('');
+  const [messageText, setMessageText] = useState('');
+  const [myProfile, setMyProfile] = useState(null);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`http://localhost:5000/api/auth/user/${id}`);
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setProfile(data.user || data);
+        } else {
+          setMessage(data.message || 'Failed to load user profile.');
+        }
+      } catch (err) {
+        setMessage('Failed to load user profile.');
+      }
+      setLoading(false);
+    };
+    fetchProfile();
+  }, [id]);
+
+  // Fetch logged-in user's profile when modal opens
+  useEffect(() => {
+    if (showRequestModal) {
+      const fetchMyProfile = async () => {
+        const userId = localStorage.getItem('userId');
+        const token = localStorage.getItem('token');
+        if (!userId) return;
+        try {
+          const res = await fetch(`http://localhost:5000/api/auth/user/${userId}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          const data = await res.json();
+          if (res.ok && data.success !== false) {
+            setMyProfile(data.user || data);
+          }
+        } catch (err) {}
+      };
+      fetchMyProfile();
+    }
+  }, [showRequestModal]);
+
+  const parseSkills = (skillsString) => {
+    if (!skillsString || typeof skillsString !== 'string') return [];
+    return skillsString.split(',').map(s => s.replace(/["]+/g, '').trim()).filter(Boolean);
+  };
+
+  const handleSkillExchange = () => {
+    setShowRequestModal(true);
+  };
+
+  const closeModal = () => {
+    setShowRequestModal(false);
+    setSelectedMySkill('');
+    setSelectedTheirSkill('');
+    setMessageText('');
+    setFormError('');
+  };
+
+  const handleBackToDashboard = () => {
+    console.log('Back to dashboard');
+  };
+
+  const handleSubmitRequest = async (e) => {
+    e.preventDefault();
+    setFormError('');
+    if (!myProfile || !profile) return;
+    const mySkills = parseSkills(myProfile.skillsOffered);
+    const myWants = parseSkills(myProfile.skillsWanted);
+    const theirOffered = parseSkills(profile.skillsOffered);
+    if (!selectedMySkill || !mySkills.includes(selectedMySkill)) {
+      toast.error('Please select one of your valid offered skills.');
+      return;
+    }
+    // Only allow wanted skills that are both in myWants and theirOffered
+    if (!selectedTheirSkill || !theirOffered.includes(selectedTheirSkill)) {
+      toast.error('Please select a skill you want that the user actually offers.');
+      return;
+    }
+    // New validation: offered skill must be wanted by the other user
+    const theirWants = parseSkills(profile.skillsWanted);
+    if (!theirWants.includes(selectedMySkill)) {
+      toast.error('The skill you are offering is not wanted by this user.');
+      return;
+    }
+    // New validation: wanted skill must be in my own wanted skills
+    if (!myWants.includes(selectedTheirSkill)) {
+      toast.error('The skill you want must be in your own wanted skills list.');
+      return;
+    }
+    const userId = localStorage.getItem('userId');
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('http://localhost:5000/api/swap-offers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          requesterId: userId,
+          requestedUserId: profile._id,
+          offeredSkills: selectedMySkill,
+          wantedSkills: selectedTheirSkill,
+          message: messageText
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success('Request sent successfully!');
+        closeModal();
+      } else {
+        toast.error(data.message || 'Failed to send request.');
+      }
+    } catch (err) {
+      toast.error('Failed to send request.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-2xl p-8 shadow-lg border max-w-md w-full mx-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-300 border-t-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium text-center">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-2xl p-8 shadow-lg border text-center max-w-md w-full mx-4">
+          <X size={32} className="text-red-400 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium mb-4">
+            {message || 'User not found.'}
+          </p>
+          <button 
+            onClick={handleBackToDashboard}
+            className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      
+
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-3xl shadow-lg border border-gray-200 overflow-hidden">
+          {/* Profile Header */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 px-8 py-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 rounded-full overflow-hidden border-3 border-white shadow-lg bg-white flex items-center justify-center">
+                  {profile.profilePhoto ? (
+                    <img 
+                      src={profile.profilePhoto} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <User size={40} className="text-purple-400" />
+                  )}
+                </div>
+                <div className="flex items-center gap-4">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {profile.username}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Star size={20} className="text-yellow-500 fill-current" />
+                    <span className="text-lg font-bold text-gray-800">
+                      {typeof profile.rating === 'number' ? profile.rating.toFixed(1) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleSkillExchange}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors shadow-md"
+                >
+                  Request
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Skills Section */}
+          <div className="px-8 py-6">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Skills Offered */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                  Skills Offered
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {parseSkills(profile.skillsOffered).length > 0 ? (
+                    parseSkills(profile.skillsOffered).map((skill, index) => (
+                      <span 
+                        key={index}
+                        className="bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-medium border border-purple-200"
+                      >
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-400 italic">No skills listed</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Skills Wanted */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  Skills Wanted
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {parseSkills(profile.skillsWanted).length > 0 ? (
+                    parseSkills(profile.skillsWanted).map((skill, index) => (
+                      <span 
+                        key={index}
+                        className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium border border-blue-200"
+                      >
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-400 italic">No skills listed</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Location & Availability Section */}
+          <div className="px-8 py-6 border-t border-gray-200">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Location</h3>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <MapPin size={18} className="text-purple-500" />
+                  <span>{profile.location || 'Not set'}</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-3">Availability</h3>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Clock size={18} className="text-blue-500" />
+                  <span>{profile.availability || 'Not set'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Info */}
+          <div className="px-8 py-6 bg-gray-50 border-t border-gray-200">
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600 mb-1">
+                  {typeof profile.rating === 'number' ? profile.rating.toFixed(1) : 'N/A'}
+                </div>
+                <div className="text-sm text-gray-600">Average Rating</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600 mb-1">
+                  {parseSkills(profile.skillsOffered).length + parseSkills(profile.skillsWanted).length}
+                </div>
+                <div className="text-sm text-gray-600">Total Skills</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600 mb-1">
+                  {profile.profileVisibility === 'public' ? 'Public' : 'Private'}
+                </div>
+                <div className="text-sm text-gray-600">Profile Status</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
+            <button onClick={closeModal} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            <h2 className="text-xl font-bold mb-6 text-center">Send Skill Swap Request</h2>
+            <form className="space-y-6" onSubmit={handleSubmitRequest}>
+              <div>
+                <label className="block mb-2 font-medium text-gray-700">Choose one of your offered skills</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500"
+                  value={selectedMySkill}
+                  onChange={e => setSelectedMySkill(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Select a skill</option>
+                  {myProfile && parseSkills(myProfile.skillsOffered).map(skill => (
+                    <option key={skill} value={skill}>{skill}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block mb-2 font-medium text-gray-700">Choose one of their offered skills you want</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500"
+                  value={selectedTheirSkill}
+                  onChange={e => setSelectedTheirSkill(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>Select a skill</option>
+                  {profile && parseSkills(profile.skillsOffered).map(skill => (
+                    <option key={skill} value={skill}>{skill}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block mb-2 font-medium text-gray-700">Message</label>
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 min-h-[80px] focus:ring-2 focus:ring-purple-500"
+                  value={messageText}
+                  onChange={e => setMessageText(e.target.value)}
+                  placeholder="Write a message..."
+                />
+              </div>
+              {formError && <div className="text-red-500 text-sm font-medium text-center">{formError}</div>}
+              <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-lg shadow">Submit</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default UserProfile;

@@ -8,12 +8,14 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 const NavBar = ({ children }) => {
   const [user, setUser] = useState(null);
   const isLoggedIn = true; // Replace with real auth logic
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -43,18 +45,26 @@ const NavBar = ({ children }) => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top Navigation Bar */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="flex items-center justify-between px-4 py-3 md:px-8">
+        <div className="flex items-center justify-between px-4 py-5 md:px-8">
           {/* Brand */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-purple-200 rounded-lg flex items-center justify-center">
-              <span className="text-purple-600 font-bold text-lg">SP</span>
-            </div>
+            <img src={logo} alt="Logo" className="w-10 h-10 rounded-lg object-cover" />
             <span className="text-xl font-bold text-gray-800 hidden sm:block">SkillXchange</span>
           </div>
           {/* Nav links */}
           <nav className="flex items-center space-x-2 md:space-x-6">
-            <button className="px-3 py-2 rounded-lg font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">Home</button>
-            <button className="px-3 py-2 rounded-lg font-medium text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors">Swap request</button>
+            <button 
+              onClick={() => navigate('/dashboard')}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors ${location.pathname === '/dashboard' ? 'text-purple-700 border-b-2 border-purple-600' : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'}`}
+            >
+              Home
+            </button>
+            <button 
+              onClick={() => navigate('/swap-requests')}
+              className={`px-3 py-2 rounded-lg font-medium transition-colors ${location.pathname === '/swap-requests' ? 'text-purple-700 border-b-2 border-purple-600' : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'}`}
+            >
+              Swap Requests
+            </button>
           </nav>
           {/* Profile & Logout */}
           <div className="flex items-center space-x-3">

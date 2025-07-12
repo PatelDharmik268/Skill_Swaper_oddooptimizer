@@ -37,9 +37,11 @@ app.get('/health', (req, res) => {
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const swapOfferRoutes = require('./routes/swapOffers');
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/swap-offers', swapOfferRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

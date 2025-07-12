@@ -5,7 +5,14 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Profile from './components/Profile';
 import NavBar from './components/NavBar';
+import SkillSwap from './components/SkillSwap';
+import UserProfile from './components/UserProfile';
+import SwapRequests from './components/SwapRequests';
+import AdminSwapRequest from './components/AdminSwapRequest';
+import AdminDashboard from './components/AdminDashboard';
 import './App.css';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   return (
@@ -15,10 +22,16 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/adminswaprequest" element={<AdminSwapRequest />} />
+          <Route path="/admindashboard" element={<AdminDashboard />} />
           <Route path="/dashboard" element={<NavBar><Dashboard /></NavBar>} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/user/:id" element={<NavBar><UserProfile /></NavBar>} />
+          <Route path="/skill-swap" element={<SkillSwap />} />
+          <Route path="/swap-requests" element={<SwapRequests />} />
         </Routes>
       </Router>
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
     </div>
   );
 }

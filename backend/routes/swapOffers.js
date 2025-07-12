@@ -30,9 +30,9 @@ router.post('/', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors.array() 
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
       });
     }
 
@@ -116,9 +116,9 @@ router.post('/', [
 router.get('/', async (req, res) => {
   try {
     const { userId, status, limit = 20, page = 1 } = req.query;
-    
+
     let query = { isActive: true };
-    
+
     // Filter by user (as requester or requested)
     if (userId) {
       if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -136,7 +136,7 @@ router.get('/', async (req, res) => {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     const swapOffers = await SwapOffer.find(query)
       .populate('requesterId', 'username firstName lastName profilePhoto')
       .populate('requestedUserId', 'username firstName lastName profilePhoto')
@@ -222,9 +222,9 @@ router.put('/:id/status', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors.array() 
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
       });
     }
 
@@ -297,9 +297,9 @@ router.delete('/:id', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: errors.array() 
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
       });
     }
 
@@ -379,16 +379,73 @@ router.get('/user/:userId/pending', async (req, res) => {
   }
 });
 
+// @route   GET /api/swap-offers/user/:userId
+// @desc    Get all swap offers for a specific user (both sent and received)
+// @access  Public (for testing)
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status, type, limit = 20, page = 1 } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+    }
+
+    const options = { status, type, limit, page };
+    const swapOffers = await SwapOffer.getOffersForUserWithMetadata(userId, options);
+
+    // Get total count for pagination
+    let countQuery = {
+      isActive: true,
+      $or: [{ requesterId: userId }, { requestedUserId: userId }]
+    };
+
+    if (status && ['pending', 'accepted', 'rejected', 'cancelled'].includes(status)) {
+      countQuery.status = status;
+    }
+
+    if (type === 'sent') {
+      countQuery = { ...countQuery, requesterId: userId };
+    } else if (type === 'received') {
+      countQuery = { ...countQuery, requestedUserId: userId };
+    }
+
+    const total = await SwapOffer.countDocuments(countQuery);
+
+    res.json({
+      success: true,
+      message: 'Swap offers retrieved successfully',
+      swapOffers,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        itemsPerPage: parseInt(limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user swap offers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching user swap offers'
+    });
+  }
+});
+
 // @route   GET /api/swap-offers/users/available
 // @desc    Get all available users for swap requests (public profiles only)
 // @access  Public
 router.get('/users/available', async (req, res) => {
   try {
     const { limit = 20, page = 1, search } = req.query;
-    
-    let query = { 
-      isActive: true, 
-      profileVisibility: 'public' 
+
+    let query = {
+      isActive: true,
+      profileVisibility: 'public'
     };
 
     // Add search functionality
@@ -403,7 +460,7 @@ router.get('/users/available', async (req, res) => {
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     const users = await User.find(query)
       .select('username firstName lastName profilePhoto skillsOffered skillsWanted location availability')
       .sort({ createdAt: -1 })
