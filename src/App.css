@@ -2,6 +2,164 @@
   text-align: center;
 }
 
+/* Animation Styles for Dashboard Cards */
+.ag-courses_box {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.ag-courses_item {
+  flex: 1 1 100%;
+  max-width: 100%;
+  -ms-flex-preferred-size: calc(33.33333% - 30px);
+  flex-basis: calc(33.33333% - 30px);
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+.ag-courses-item_link {
+  display: block;
+  padding: 20px;
+  overflow: hidden;
+  position: relative; /* This rule correctly anchors the background circle */
+  transition: all 0.3s ease;
+}
+
+.ag-courses-item_link:hover {
+  transform: translateY(0px);
+}
+
+.ag-courses-item_link:hover .ag-courses-item_bg {
+  transform: scale(15);
+}
+
+/* Profile photo styles */
+.ag-courses-item_link .profile-photo {
+  position: relative;
+  z-index: 5;
+}
+
+.ag-courses-item_link:hover .profile-photo img,
+.ag-courses-item_link:hover .profile-photo svg {
+  border: 2px solid white;
+  filter: brightness(1.1);
+  position: relative;
+  z-index: 5;
+}
+
+/* Content styles */
+.ag-courses-item_link .content-wrapper {
+  position: relative;
+  z-index: 5;
+}
+
+/* Style text elements on hover */
+.ag-courses-item_link:hover .text-gray-800,
+.ag-courses-item_link:hover .text-gray-700,
+.ag-courses-item_link:hover .text-gray-600,
+.ag-courses-item_link:hover .text-gray-500,
+.ag-courses-item_link:hover .text-gray-400 {
+  color: white !important;
+  position: relative;
+  z-index: 5;
+}
+
+/* Style skill tags on hover */
+.ag-courses-item_link:hover .bg-purple-50 {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white !important;
+  position: relative;
+  z-index: 5;
+}
+
+.ag-courses-item_link:hover .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white !important;
+  position: relative;
+  z-index: 5;
+}
+
+/* Keep icons visible */
+.ag-courses-item_link:hover .text-purple-600,
+.ag-courses-item_link:hover .text-yellow-500 {
+  color: white !important;
+  opacity: 1;
+  position: relative;
+  z-index: 5;
+}
+
+/* Button styles */
+.ag-courses-item_link .request-button {
+  position: relative;
+  z-index: 5;
+}
+
+.ag-courses-item_link:hover .request-button button {
+  background-color: white !important;
+  color: #952aff !important;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 5;
+}
+
+.ag-courses-item_bg {
+  height: 128px;
+  width: 128px;
+  background-color: #952aff;
+  z-index: 1;
+  position: absolute;
+  top: -75px;
+  right: -75px;
+  border-radius: 50%;
+  transition: all 0.5s ease;
+  opacity: 0.95;
+}
+
+/* Ensure content stays on top */
+.profile-photo,
+.content-wrapper,
+.request-button {
+  position: relative;
+  z-index: 10 !important;
+}
+
+/*
+  THE PROBLEMATIC RULE BELOW HAS BEEN REMOVED.
+  It was incorrectly applying `position: relative` to every single
+  element inside the card, which broke the background's positioning.
+*/
+/*
+.ag-courses-item_link * {
+  position: relative;
+}
+*/
+
+.ag-courses-item_link:hover .profile-photo img,
+.ag-courses-item_link:hover .profile-photo svg,
+.ag-courses-item_link:hover .request-button button {
+  z-index: 10 !important;
+}
+
+/* Responsive styles */
+@media only screen and (max-width: 979px) {
+  .ag-courses_item {
+    flex: 0 0 calc(50% - 30px);
+  }
+}
+
+@media only screen and (max-width: 767px) {
+  .ag-courses_item {
+    flex: 0 0 100%;
+  }
+}
+
+/* Original App styles */
 .App-logo {
   height: 40vmin;
   pointer-events: none;

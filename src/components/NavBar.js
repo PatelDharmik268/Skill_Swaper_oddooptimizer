@@ -42,7 +42,7 @@ const NavBar = ({ children }) => {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top Navigation Bar */}
       <header className="bg-white shadow-sm border-b border-purple-700 sticky top-0 z-50 transition-all duration-300">
-        <div className="flex items-center justify-between px-4 py-3 md:px-8">
+        <div className="flex items-center justify-between px-4 py-4 md:px-8">
           {/* Brand */}
           <div className="flex items-center space-x-3 group">
             <div className="relative">
@@ -125,7 +125,7 @@ const NavBar = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-3xl mx-auto px-2 sm:px-4 py-6 flex flex-col">
+      <main className="flex-1 w-full flex flex-col overflow-hidden">
         {children}
       </main>
     </div>

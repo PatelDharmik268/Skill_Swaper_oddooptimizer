@@ -1,20 +1,140 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { User, LogOut, Send, Search, Check, CheckCheck } from 'lucide-react';
-import logo from '../assets/logo.png';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import React, { useEffect, useState, useRef, useCallback, Suspense, lazy } from 'react';
+import { User, Send } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import io from 'socket.io-client';
+import NavBar from './NavBar';
 
+// Lazy load components
+const LazyImage = lazy(() => import('./LazyImage'));
+const ChatMessage = lazy(() => import('./ChatMessage'));
+
+// Lazy loaded placeholder component
+const LoadingPlaceholder = () => (
+  <div className="flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+  </div>
+);
+// Main component definition
 const MessengerPage = () => {
   const [users, setUsers] = useState([]);
   const [activeUser, setActiveUser] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([]);          
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState({});
   const messagesEndRef = useRef(null);
+  const socketRef = useRef();
+  const typingTimeoutRef = useRef(null);
   const myId = localStorage.getItem('userId');
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Memoized function to handle new messages
+  const handleNewMessage = useCallback((message) => {
+    console.log('Received new message:', message);
+
+    setMessages(prev => {
+      // Check if message already exists
+      const messageExists = prev.some(msg =>
+        msg._id === message._id ||
+        (msg.isTemp && msg.from === message.from && msg.content === message.content)
+      );
+
+      if (!messageExists) {
+        // If this message is for the current chat, add it
+        if (activeUser && (message.from === activeUser._id || message.to === activeUser._id)) {
+          console.log('Adding new message to chat');
+          return [...prev, message];
+        }
+      }
+      return prev;
+    });
+
+    // Update last messages for both sender and receiver
+    const chatPartnerId = message.from === myId ? message.to : message.from;
+    setLastMessages(prev => ({
+      ...prev,
+      [chatPartnerId]: message
+    }));
+
+    // Update unread counts for messages from others
+    if (message.from !== myId) {
+      setUnreadCounts(prev => ({
+        ...prev,
+        [message.from]: (prev[message.from] || 0) + 1
+      }));
+    }
+  }, [activeUser, myId]);
+
+  // Initialize socket connection
+  useEffect(() => {
+    if (!myId) return;
+
+    console.log('Initializing socket connection');
+    socketRef.current = io('http://localhost:5000', {
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    // Join user's room
+    socketRef.current.emit('join', myId);
+    console.log('Joined room for user:', myId);
+
+    // Listen for connection events
+    socketRef.current.on('connect', () => {
+      console.log('Socket connected');
+      socketRef.current.emit('join', myId);
+    });
+
+    socketRef.current.on('disconnect', () => {
+      console.log('Socket disconnected');
+    });
+
+    // Listen for new messages
+    socketRef.current.on('newMessage', handleNewMessage);
+
+    // Handle saved message confirmations
+    socketRef.current.on('messageSaved', ({ tempId, savedMessage }) => {
+      console.log('Message saved:', savedMessage);
+      setMessages(prev =>
+        prev.map(msg => msg._id === tempId ? savedMessage : msg)
+      );
+    });
+
+    // Handle message errors
+    socketRef.current.on('messageError', ({ tempId }) => {
+      console.error('Message failed to save:', tempId);
+      setMessages(prev => prev.filter(msg => msg._id !== tempId));
+    });
+
+    // Handle typing events
+    socketRef.current.on('userTyping', ({ from }) => {
+      console.log('User typing:', from);
+      setTypingUsers(prev => ({ ...prev, [from]: true }));
+    });
+
+    socketRef.current.on('userStoppedTyping', ({ from }) => {
+      console.log('User stopped typing:', from);
+      setTypingUsers(prev => ({ ...prev, [from]: false }));
+    });
+
+    return () => {
+      console.log('Cleaning up socket connection');
+      if (socketRef.current) {
+        socketRef.current.off('newMessage');
+        socketRef.current.off('messageSaved');
+        socketRef.current.off('messageError');
+        socketRef.current.off('userTyping');
+        socketRef.current.off('userStoppedTyping');
+        socketRef.current.disconnect();
+      }
+    };
+  }, [myId, handleNewMessage]);
 
   // Fetch current user profile for header
   useEffect(() => {
@@ -37,6 +157,9 @@ const MessengerPage = () => {
     fetchUser();
   }, []);
 
+  // State to store last messages
+  const [lastMessages, setLastMessages] = useState({});
+
   // Fetch chat contacts and unread counts
   useEffect(() => {
     const fetchContacts = async () => {
@@ -49,9 +172,28 @@ const MessengerPage = () => {
         const data = await res.json();
         if (data.success) {
           setUsers(data.users);
+          // Fetch last message for each user
+          data.users.forEach(user => {
+            fetchLastMessage(user._id);
+          });
         }
       } catch (err) {
         console.error("Failed to fetch contacts:", err);
+      }
+    };
+
+    const fetchLastMessage = async (userId) => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/messages/${myId}/${userId}?limit=1`);
+        const data = await res.json();
+        if (data.success && data.messages.length > 0) {
+          setLastMessages(prev => ({
+            ...prev,
+            [userId]: data.messages[0]
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch last message:", err);
       }
     };
 
@@ -70,19 +212,34 @@ const MessengerPage = () => {
     };
 
     fetchContacts();
-    const intervalId = setInterval(fetchUnreadCounts, 5000); // Poll for new messages
+    fetchUnreadCounts();
+    const intervalId = setInterval(fetchUnreadCounts, 10000); // Poll every 10 seconds instead of 5
     return () => clearInterval(intervalId);
   }, [myId]);
+
+  // Update last messages when new message is received
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      setLastMessages(prev => ({
+        ...prev,
+        [activeUser?._id]: lastMessage
+      }));
+    }
+  }, [messages, activeUser]);
 
   // Fetch messages for the active chat
   useEffect(() => {
     if (!activeUser) return;
+
+    console.log('Fetching messages for user:', activeUser.username);
 
     const fetchMessages = async () => {
       try {
         const res = await fetch(`http://localhost:5000/api/messages/${myId}/${activeUser._id}`);
         const data = await res.json();
         if (data.success) {
+          console.log('Fetched messages:', data.messages.length);
           setMessages(data.messages);
         }
       } catch (err) {
@@ -91,16 +248,16 @@ const MessengerPage = () => {
     };
 
     const markMessagesAsRead = async () => {
-        try {
-            await fetch(`http://localhost:5000/api/messages/mark-read`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: myId, fromUserId: activeUser._id })
-            });
-            setUnreadCounts(prev => ({ ...prev, [activeUser._id]: 0 }));
-        } catch (err) {
-            console.error("Failed to mark messages as read:", err);
-        }
+      try {
+        await fetch(`http://localhost:5000/api/messages/mark-read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: myId, fromUserId: activeUser._id })
+        });
+        setUnreadCounts(prev => ({ ...prev, [activeUser._id]: 0 }));
+      } catch (err) {
+        console.error("Failed to mark messages as read:", err);
+      }
     };
 
     fetchMessages();
@@ -109,33 +266,109 @@ const MessengerPage = () => {
 
   // Scroll to the bottom of the messages list when new messages are added
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
-
 
   // Handle sending a new message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!activeUser || !newMessage.trim()) return;
+    if (!activeUser || !newMessage.trim() || !socketRef.current || sending) return;
+
+    const messageText = newMessage.trim();
+    console.log('Sending message:', messageText);
+
     setSending(true);
+
     try {
+      const tempId = `temp_${Date.now()}_${Math.random()}`;
+      const messageData = {
+        _id: tempId,
+        from: myId,
+        to: activeUser._id,
+        content: messageText,
+        timestamp: new Date().toISOString(),
+        isTemp: true // Mark as temporary
+      };
+
+      // Clear the input immediately
+      setNewMessage("");
+      handleStopTyping();
+
+      // Add message to UI immediately for instant feedback
+      setMessages(prev => [...prev, messageData]);
+
+      // Send through socket first
+      socketRef.current.emit('sendMessage', {
+        ...messageData,
+        isTemp: false // Remove temp flag for socket
+      });
+
+      // Save to database
       const res = await fetch('http://localhost:5000/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: myId, to: activeUser._id, content: newMessage.trim() })
+        body: JSON.stringify({
+          from: myId,
+          to: activeUser._id,
+          content: messageText,
+          timestamp: messageData.timestamp
+        })
       });
+
       const data = await res.json();
+
       if (data.success) {
-        setMessages(prev => [...prev, data.message]);
-        setNewMessage("");
+        // Replace temporary message with the real one from database
+        setMessages(prev => prev.map(msg =>
+          msg._id === tempId ? { ...data.message, _id: data.message._id } : msg
+        ));
+        console.log('Message saved successfully');
       } else {
-        // Handle message sending error
-        console.error("Failed to send message:", data.message);
+        console.error("Failed to save message:", data.message);
+        // Remove the temporary message if save failed
+        setMessages(prev => prev.filter(msg => msg._id !== tempId));
       }
     } catch (err) {
       console.error("Error sending message:", err);
+      // Remove the temporary message on error
+      setMessages(prev => prev.filter(msg => msg.isTemp && msg.content === messageText));
+    } finally {
+      setSending(false);
     }
-    setSending(false);
+  };
+
+  // Handle typing status
+  const handleTyping = () => {
+    if (!activeUser || !socketRef.current) return;
+
+    if (!isTyping) {
+      setIsTyping(true);
+      socketRef.current.emit('typing', { from: myId, to: activeUser._id });
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout
+    typingTimeoutRef.current = setTimeout(() => {
+      handleStopTyping();
+    }, 2000);
+  };
+
+  const handleStopTyping = () => {
+    if (isTyping && activeUser && socketRef.current) {
+      setIsTyping(false);
+      socketRef.current.emit('stopTyping', { from: myId, to: activeUser._id });
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
   };
 
   const handleLogout = () => {
@@ -146,79 +379,16 @@ const MessengerPage = () => {
 
   // Main component render
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      {/* Main Header */}
-      <header className="bg-white shadow-sm border-b border-purple-700 sticky top-0 z-50 transition-all duration-300">
-          <div className="flex items-center justify-between px-4 py-4 md:px-8">
-            <div className="flex items-center space-x-3 group">
-              <div className="relative">
-                <div className="flex justify-center mb-0">
-                  <img src={logo} alt="Logo" className="w-11 h-11 rounded-2xl object-cover" />
-                </div>
-              </div>
-              <span className="text-2xl font-bold text-purple-800 hidden sm:block">SkillXchange</span>
+    <NavBar>
+      <div className="h-[calc(100vh-4rem)] flex">
+        {/* Main chat interface */}
+        <div className="flex w-full">
+          {/* Sidebar with user list */}
+          <aside className="w-full md:w-1/3 lg:w-1/4 bg-white border-r border-gray-200 flex flex-col max-h-full">
+            <div className="p-4 border-b border-gray-300">
+              <h2 className="text-xl font-bold text-gray-800">Chats</h2>
             </div>
-            <nav className="hidden md:flex items-center space-x-2 md:space-x-6">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${location.pathname === '/dashboard'
-                    ? 'bg-purple-100 text-purple-900 shadow-md'
-                    : 'text-purple-900 hover:bg-purple-50'
-                  }`}
-              >
-                Home
-              </button>
-              <button
-                onClick={() => navigate('/swap-requests')}
-                className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${location.pathname === '/swap-requests'
-                    ? 'bg-purple-100 text-purple-900 shadow-md'
-                    : 'text-purple-900 hover:bg-purple-50'
-                  }`}
-              >
-                Swap Requests
-              </button>
-              <Link
-                to="/messenger"
-                className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 ${location.pathname === '/messenger'
-                    ? 'bg-purple-100 text-purple-900 shadow-md'
-                    : 'text-purple-900 hover:bg-purple-50'
-                  }`}
-              >
-                Chat
-              </Link>
-            </nav>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => navigate('/profile')}
-                className="w-12 h-12 rounded-full border-2 border-purple-400 flex items-center justify-center bg-white hover:border-purple-500 transition-all shadow-md hover:scale-105"
-                title="Profile"
-              >
-                {currentUser && currentUser.profilePhoto ? (
-                  <img src={currentUser.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover" />
-                ) : (
-                  <User size={32} className="text-purple-600" />
-                )}
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-6 py-3 bg-purple-800 text-white rounded-xl font-semibold hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                title="Logout"
-              >
-                <LogOut size={20} className="mr-2 inline" />
-                Logout
-              </button>
-            </div>
-          </div>
-        </header>
-
-      {/* Main chat interface */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar with user list */}
-        <aside className="w-full md:w-1/3 lg:w-1/4 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800">Chats</h2>
-          </div>
-          <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {users.length === 0 ? (
               <p className="text-gray-500 text-center mt-8">No active chats.</p>
             ) : (
@@ -226,31 +396,47 @@ const MessengerPage = () => {
                 <div
                   key={user._id}
                   onClick={() => setActiveUser(user)}
-                  className={`flex items-center gap-3 p-3 cursor-pointer border-l-4 ${
-                    activeUser?._id === user._id
-                      ? 'bg-gray-100 border-teal-500'
-                      : 'border-transparent hover:bg-gray-50'
-                  }`}
+                  className="relative"
                 >
-                  <div className="relative">
-                     {user.profilePhoto ? (
-                        <img src={user.profilePhoto} alt="Profile" className="w-12 h-12 rounded-full object-cover" />
-                     ) : (
+                  <div className={`flex items-center gap-3 p-3 cursor-pointer transition-colors relative ${
+                    activeUser?._id === user._id
+                      ? 'bg-gray-100'
+                      : 'hover:bg-gray-50'
+                  }`}>
+                    <div className="absolute left-[20%] right-[0%] bottom-0 border-b border-gray-300"></div>
+                    <div className="relative">
+                      <Suspense fallback={
                         <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
-                            <User size={24} className="text-gray-500" />
+                          <User size={24} className="text-gray-500" />
                         </div>
-                     )}
+                      }>
+                        <LazyImage
+                          src={user.profilePhoto}
+                          alt="Profile"
+                          className="w-12 h-12 rounded-full object-cover"
+                          fallbackSize={24}
+                        />
+                      </Suspense>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 text-left mb-0.5">{user.username}</p>
+                      <p className="text-sm text-gray-500 truncate text-left">
+                        {lastMessages[user._id] ? (
+                          <>
+                            {lastMessages[user._id].from === myId ? "You: " : ""}
+                            {lastMessages[user._id].content}
+                          </>
+                        ) : (
+                          "Click to start chatting..."
+                        )}
+                      </p>
+                    </div>
+                    {Number(unreadCounts[user._id]) > 0 && (
+                      <span className="bg-teal-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadCounts[user._id]}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-800">{user.username}</p>
-                    {/* Placeholder for last message */}
-                    <p className="text-sm text-gray-500 truncate">Last message...</p>
-                  </div>
-                  {Number(unreadCounts[user._id]) > 0 && (
-                    <span className="bg-teal-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                      {unreadCounts[user._id]}
-                    </span>
-                  )}
                 </div>
               ))
             )}
@@ -258,53 +444,69 @@ const MessengerPage = () => {
         </aside>
 
         {/* Chat Window */}
-        <main className="flex-1 flex flex-col bg-gray-200" style={{backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')"}}>
+        <main className="flex-1 flex flex-col bg-gray-200 h-full" style={{ backgroundImage: "url('https://i.pinimg.com/736x/8c/98/99/8c98994518b575bfd8c949e91d20548b.jpg')" }}>
           {activeUser ? (
             <>
               {/* Chat Header */}
-              <header className="flex items-center gap-4 p-3 bg-white border-b border-gray-200">
-                 {activeUser.profilePhoto ? (
-                    <img src={activeUser.profilePhoto} alt="Profile" className="w-10 h-10 rounded-full object-cover" />
-                 ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
-                        <User size={20} className="text-gray-500" />
-                    </div>
-                 )}
+              <header className="flex items-center gap-4 p-3 bg-white border-b border-gray-200 shrink-0">
+                <Suspense fallback={
+                  <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center">
+                    <User size={20} className="text-gray-500" />
+                  </div>
+                }>
+                  <LazyImage
+                    src={activeUser.profilePhoto}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                    fallbackSize={20}
+                  />
+                </Suspense>
                 <div>
                   <p className="font-semibold text-gray-800">{activeUser.username}</p>
-                  <p className="text-xs text-gray-500">Online</p> {/* Placeholder */}
+                  <p className="text-xs text-gray-500">
+                    {typingUsers[activeUser._id] ? 'Typing...' : 'Online'}
+                  </p>
                 </div>
               </header>
 
               {/* Messages Area */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {messages.map(msg => {
-                  const isMe = myId === msg.from;
-                  const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  return (
-                    <div key={msg._id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-md lg:max-w-lg px-4 py-2 rounded-xl shadow ${isMe ? 'bg-teal-500 text-white' : 'bg-white text-gray-800'}`}>
-                        <p>{msg.content}</p>
-                        <div className={`text-xs mt-1 ${isMe ? 'text-teal-100' : 'text-gray-400'} text-right`}>
-                          {time}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-teal-500"></div>
+                  </div>
+                }>
+                  {messages.map((msg, index) => (
+                    <ChatMessage
+                      key={`${msg._id}-${index}`}
+                      message={msg}
+                      isMe={myId === msg.from}
+                      myId={myId}
+                    />
+                  ))}
+                </Suspense>
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Message Input */}
-              <footer className="p-4 bg-white border-t border-gray-200">
+              <footer className="p-4 bg-white border-t border-gray-200 shrink-0">
+                {typingUsers[activeUser?._id] && (
+                  <div className="text-sm text-gray-500 italic mb-2">
+                    {activeUser.username} is typing...
+                  </div>
+                )}
                 <form className="flex items-center gap-4" onSubmit={handleSendMessage}>
                   <input
                     type="text"
                     className="flex-1 bg-gray-100 rounded-full px-5 py-3 outline-none focus:ring-2 focus:ring-teal-400 text-gray-800"
                     placeholder="Type a message..."
                     value={newMessage}
-                    onChange={e => setNewMessage(e.target.value)}
+                    onChange={e => {
+                      setNewMessage(e.target.value);
+                      handleTyping();
+                    }}
                     disabled={sending}
+                    autoComplete="off"
                   />
                   <button
                     type="submit"
@@ -318,16 +520,16 @@ const MessengerPage = () => {
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center text-black">
-                <div>
-                    <h2 className="text-2xl font-semibold">Welcome to SkillXchange Messenger</h2>
-                    <p>Select a chat to start sharing skills.</p>
-                </div>
+              <div>
+                <h2 className="text-2xl font-semibold">Welcome to SkillXchange Messenger</h2>
+                <p>Select a chat to start sharing skills.</p>
+              </div>
             </div>
           )}
         </main>
       </div>
     </div>
-  );
-};
+  </NavBar> 
+  )};
 
 export default MessengerPage;

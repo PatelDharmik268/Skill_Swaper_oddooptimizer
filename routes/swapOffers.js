@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const SwapOffer = require('../models/SwapOffer');
 const User = require('../models/User');
+const { sendSkillExchangeInvitation } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -94,6 +95,30 @@ router.post('/', [
 
     // Populate user data for response
     await swapOffer.getOfferWithUsers();
+
+    // Send email notification to the requested user
+    try {
+      const invitationData = {
+        recipientEmail: requestedUser.email,
+        recipientName: requestedUser.firstName || requestedUser.username,
+        senderName: requester.firstName || requester.username,
+        senderUsername: requester.username,
+        offeredSkills: offeredSkills.split(',').map(s => s.trim()),
+        wantedSkills: wantedSkills.split(',').map(s => s.trim()),
+        message: message,
+        invitationLink: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/swap-requests`
+      };
+
+      const emailResult = await sendSkillExchangeInvitation(invitationData);
+      if (emailResult.success) {
+        console.log('Email notification sent successfully');
+      } else {
+        console.error('Failed to send email notification:', emailResult.error);
+      }
+    } catch (emailError) {
+      console.error('Error sending email notification:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.status(201).json({
       success: true,
